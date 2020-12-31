@@ -18,7 +18,7 @@ packages:
   camera:
     dependency: "direct main"
     description:
-      path: "../camera"
+      path: "dependencies/camera"
       relative: true
     source: path
     version: "0.6.4"
