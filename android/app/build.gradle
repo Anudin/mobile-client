@@ -23,6 +23,7 @@ if (flutterVersionName == null) {
 
 apply plugin: 'com.android.application'
 apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
+apply plugin: 'com.google.gms.google-services'
 
 android {
     compileSdkVersion 29
@@ -36,8 +37,13 @@ android {
         applicationId "com.example.mobile"
         minSdkVersion 21
         targetSdkVersion 29
+        multiDexEnabled true
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+    }
+
+    dependencies {
+        implementation 'com.android.support:multidex:1.0.3'
     }
 
     buildTypes {
