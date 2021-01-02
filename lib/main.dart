@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:built_collection/built_collection.dart';
 import 'package:firebase_ml_vision/firebase_ml_vision.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile/util.dart';
 import 'package:wakelock/wakelock.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -16,13 +18,20 @@ List<CameraDescription> cameras;
 // FIXME Handle camera lifecycle, see https://pub.dev/packages/camera#handling-lifecycle-states
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final aliasCubit = AliasCubit();
+  aliasCubit.create(Alias('google', 'https://www.google.com'));
+  aliasCubit.create(Alias('reddit', 'https://www.reddit.com'));
+  aliasCubit.create(Alias('rickroll', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', '420s'));
   cameras = await availableCameras();
   if (!kReleaseMode) {
     Wakelock.enable();
   }
   runApp(
-    MaterialApp(
-      home: MainScreen(),
+    BlocProvider.value(
+      value: aliasCubit,
+      child: MaterialApp(
+        home: MainScreen(),
+      ),
     ),
   );
 }
@@ -37,13 +46,18 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final aliasCubit = BlocProvider.of<AliasCubit>(context);
     return Scaffold(
       body: SafeArea(
         child: [CameraView(), AliasMasterView()][_selected],
       ),
       floatingActionButton: _selected == 1
           ? FloatingActionButton(
-              onPressed: () {},
+              onPressed: () async {
+                final alias = await Navigator.of(context)
+                    .push(MaterialPageRoute(builder: (context) => AliasDetailView(alias: Alias('', ''))));
+                if (alias != null) aliasCubit.create(alias);
+              },
               child: Icon(Icons.add),
             )
           : null,
@@ -64,34 +78,42 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-// TODO Implement Dismissable?
+// TODO Undo dismiss, insert in same position?
 class AliasMasterView extends StatelessWidget {
-  final aliasses = [
-    Alias('google', 'https://www.google.com'),
-    Alias('reddit', 'https://www.reddit.com'),
-    Alias('rickroll', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', '420s')
-  ];
-
   @override
   Widget build(BuildContext context) {
-    return Container(
-      child: ListView(
-          children: aliasses
-              .map(
-                (alias) => ListTile(
-                  title: Text(alias.alias),
-                  // TODO Shorten URL: remove http[s]://www. and limit length, if necessary add ...
-                  subtitle: Text(alias.URL),
-                  trailing: Text(alias.position ?? ''),
-                  onTap: () async {
-                    // TODO Give feedback
-                    final result = await Navigator.of(context)
-                        .push(MaterialPageRoute(builder: (context) => AliasDetailView(alias: alias)));
-                    print(result);
-                  },
-                ),
-              )
-              .toList()),
+    final aliasCubit = BlocProvider.of<AliasCubit>(context);
+    return BlocBuilder<AliasCubit, BuiltMap<String, Alias>>(
+      builder: (context, state) => ListView(
+        children: [
+          for (var uuid in state.keys)
+            Dismissible(
+              key: Key(uuid),
+              background: Container(
+                color: Colors.black12,
+                padding: EdgeInsets.only(left: 16),
+                alignment: Alignment.centerLeft,
+                child: Icon(Icons.delete_outline),
+              ),
+              direction: DismissDirection.startToEnd,
+              onDismissed: (direction) {
+                aliasCubit.delete(uuid);
+              },
+              child: ListTile(
+                title: Text(state[uuid].alias),
+                // TODO Shorten URL: remove http[s]://www. and limit length, if necessary add ...
+                subtitle: Text(state[uuid].URL),
+                trailing: Text(state[uuid].position ?? ''),
+                onTap: () async {
+                  // TODO Give feedback
+                  final update = await Navigator.of(context)
+                      .push(MaterialPageRoute(builder: (context) => AliasDetailView(alias: state[uuid])));
+                  if (update != null) aliasCubit.update(uuid, update);
+                },
+              ),
+            )
+        ],
+      ),
     );
   }
 }
@@ -293,7 +315,6 @@ class _CameraViewState extends State<CameraView> {
                   } catch (exception) {
                     print(exception);
                   }
-
                   cloudTextRecognizer.close();
                   showDevToast(text);
                 });

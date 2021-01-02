@@ -23,12 +23,17 @@ environment:
 dependencies:
   path: ^1.7.0
   equatable: ^1.2.3
+  bloc: ^6.0.0
+  hydrated_bloc: ^6.1.0
+  uuid: 2.2.2
+  built_collection: ^4.3.2
 
   flutter:
     sdk: flutter
 
   camera:
     path: dependencies/camera
+  flutter_bloc: ^6.0.0
   firebase_core: ^0.4.0+9
   firebase_ml_vision: ^0.9.10
   path_provider: ^1.6.24
