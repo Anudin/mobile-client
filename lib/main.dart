@@ -169,6 +169,7 @@ class _AliasDetailViewState extends State<AliasDetailView> {
                   children: [
                     FlatButton(
                       child: Text('Verwerfen'),
+                      // TODO Show discard changes dialog?
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     RaisedButton(
@@ -193,21 +194,25 @@ class _AliasDetailViewState extends State<AliasDetailView> {
       (widget.alias.position ?? '') != _positionEditingController.text;
 
   void _onConfirmChanges() {
-    // FIXME Implement validators
-    final formDataIsValid = _formKey.currentState.validate();
-    if (formDataIsValid) {
-      Navigator.of(context).pop(Alias(
-        _aliasEditingController.text,
-        _URLEditingController.text,
-        _positionEditingController.text != '' ? _positionEditingController.text : null,
-      ));
+    if (_hasChanges()) {
+      // FIXME Implement validators
+      final hasValidChanges = _formKey.currentState.validate();
+      if (hasValidChanges) {
+        Navigator.of(context).pop(Alias(
+          _aliasEditingController.text,
+          _URLEditingController.text,
+          _positionEditingController.text != '' ? _positionEditingController.text : null,
+        ));
+      } else {
+        Fluttertoast.showToast(
+          msg: 'Die Eingaben enthalten Fehler.',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          fontSize: 16.0,
+        );
+      }
     } else {
-      Fluttertoast.showToast(
-        msg: 'Die Eingaben enthalten Fehler.',
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.BOTTOM,
-        fontSize: 16.0,
-      );
+      Navigator.of(context).pop();
     }
   }
 
@@ -227,7 +232,6 @@ class _AliasDetailViewState extends State<AliasDetailView> {
           ),
         ],
       ),
-      useRootNavigator: true,
     );
   }
 }
