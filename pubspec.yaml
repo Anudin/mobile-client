@@ -22,6 +22,7 @@ environment:
 
 dependencies:
   path: ^1.7.0
+  equatable: ^1.2.3
 
   flutter:
     sdk: flutter

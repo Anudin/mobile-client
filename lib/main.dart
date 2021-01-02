@@ -6,11 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:mobile/util.dart';
 import 'package:wakelock/wakelock.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 import 'alias.dart';
 
 List<CameraDescription> cameras;
 
+// FIXME Alias persistence - UIDs, data order vs sorting order
 // FIXME Handle camera lifecycle, see https://pub.dev/packages/camera#handling-lifecycle-states
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,7 +38,16 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: [CameraView(), AliasMasterView()][_selected],
+      body: SafeArea(
+        child: [CameraView(), AliasMasterView()][_selected],
+      ),
+      floatingActionButton: _selected == 1
+          ? FloatingActionButton(
+              onPressed: () {},
+              child: Icon(Icons.add),
+            )
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: BottomNavigationBar(
         onTap: (index) {
           setState(() {
@@ -53,6 +64,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
+// TODO Implement Dismissable?
 class AliasMasterView extends StatelessWidget {
   final aliasses = [
     Alias('google', 'https://www.google.com'),
@@ -68,11 +80,13 @@ class AliasMasterView extends StatelessWidget {
               .map(
                 (alias) => ListTile(
                   title: Text(alias.alias),
+                  // TODO Shorten URL: remove http[s]://www. and limit length, if necessary add ...
                   subtitle: Text(alias.URL),
                   trailing: Text(alias.position ?? ''),
                   onTap: () async {
+                    // TODO Give feedback
                     final result = await Navigator.of(context)
-                        .push(MaterialPageRoute(builder: (context) => AliasDetailView(alias)));
+                        .push(MaterialPageRoute(builder: (context) => AliasDetailView(alias: alias)));
                     print(result);
                   },
                 ),
@@ -82,20 +96,138 @@ class AliasMasterView extends StatelessWidget {
   }
 }
 
-class AliasDetailView extends StatelessWidget {
+class AliasDetailView extends StatefulWidget {
   final Alias alias;
 
-  AliasDetailView(this.alias);
+  AliasDetailView({@required this.alias});
+
+  @override
+  _AliasDetailViewState createState() => _AliasDetailViewState();
+}
+
+class _AliasDetailViewState extends State<AliasDetailView> {
+  final _formKey = GlobalKey<FormState>();
+  TextEditingController _aliasEditingController;
+  TextEditingController _URLEditingController;
+  TextEditingController _positionEditingController;
+
+  @override
+  void initState() {
+    super.initState();
+    _aliasEditingController = TextEditingController(text: widget.alias.alias);
+    _URLEditingController = TextEditingController(text: widget.alias.URL);
+    _positionEditingController = TextEditingController(text: widget.alias.position);
+  }
+
+  @override
+  void dispose() {
+    _aliasEditingController.dispose();
+    _URLEditingController.dispose();
+    _positionEditingController.dispose();
+    super.dispose();
+  }
+
+  bool valid = false;
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      // Ensure that the edited instance is returned, even is the back button is used
-      onWillPop: () async {
-        Navigator.of(context).pop(alias);
-        return false;
-      },
-      child: SizedBox.shrink(),
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          child: Form(
+            key: _formKey,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            onWillPop: () async {
+              if (_hasChanges()) {
+                final shouldDiscardChanges = await showDiscardChangesDialog(context);
+                return shouldDiscardChanges;
+              } else {
+                return true;
+              }
+            },
+            child: Column(
+              children: [
+                TextFormField(
+                  decoration: InputDecoration(labelText: 'Alias'),
+                  controller: _aliasEditingController,
+                  validator: (text) => null,
+                ),
+                TextFormField(
+                  controller: _URLEditingController,
+                  decoration: InputDecoration(labelText: 'URL'),
+                  maxLines: null,
+                  validator: (text) => null,
+                ),
+                TextFormField(
+                  controller: _positionEditingController,
+                  decoration: InputDecoration(labelText: 'Position'),
+                  validator: (text) => null,
+                ),
+                Spacer(),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    FlatButton(
+                      child: Text('Verwerfen'),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                    RaisedButton(
+                      color: Colors.lightGreen,
+                      child: Text('Bestätigen'),
+                      onPressed: _onConfirmChanges,
+                    ),
+                  ],
+                )
+              ],
+            ),
+          ),
+          padding: EdgeInsets.all(16),
+        ),
+      ),
+    );
+  }
+
+  bool _hasChanges() =>
+      widget.alias.alias != _aliasEditingController.text ||
+      widget.alias.URL != _URLEditingController.text ||
+      (widget.alias.position ?? '') != _positionEditingController.text;
+
+  void _onConfirmChanges() {
+    // FIXME Implement validators
+    final formDataIsValid = _formKey.currentState.validate();
+    if (formDataIsValid) {
+      Navigator.of(context).pop(Alias(
+        _aliasEditingController.text,
+        _URLEditingController.text,
+        _positionEditingController.text != '' ? _positionEditingController.text : null,
+      ));
+    } else {
+      Fluttertoast.showToast(
+        msg: 'Die Eingaben enthalten Fehler.',
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        fontSize: 16.0,
+      );
+    }
+  }
+
+  Future<bool> showDiscardChangesDialog(BuildContext context) {
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Änderungen verwerfen?'),
+        actions: [
+          FlatButton(
+            child: Text('Nein'),
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
+          FlatButton(
+            child: Text('Ja'),
+            onPressed: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
+      useRootNavigator: true,
     );
   }
 }
@@ -141,7 +273,7 @@ class _CameraViewState extends State<CameraView> {
         Align(
           alignment: Alignment.bottomCenter,
           child: Padding(
-            padding: EdgeInsets.all(24),
+            padding: EdgeInsets.all(16),
             child: TakePictureFAB(
               onPressed: () {
                 cameraController.takePicture().then((xfile) async {
