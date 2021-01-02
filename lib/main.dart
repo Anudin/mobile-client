@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:firebase_ml_vision/firebase_ml_vision.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -38,13 +39,13 @@ class CameraApp extends StatefulWidget {
 }
 
 class _CameraAppState extends State<CameraApp> {
-  CameraController controller;
+  CameraController cameraController;
 
   @override
   void initState() {
     super.initState();
-    controller = CameraController(cameras[0], ResolutionPreset.veryHigh);
-    controller.initialize().then((_) {
+    cameraController = CameraController(cameras[0], ResolutionPreset.veryHigh);
+    cameraController.initialize().then((_) {
       if (!mounted) {
         return;
       }
@@ -54,48 +55,41 @@ class _CameraAppState extends State<CameraApp> {
 
   @override
   void dispose() {
-    controller?.dispose();
+    cameraController?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!controller.value.isInitialized) {
+    if (!cameraController.value.isInitialized) {
       return Container();
     }
     return Stack(
       fit: StackFit.expand,
       children: [
         AspectRatio(
-          aspectRatio: controller.value.aspectRatio,
-          child: CameraPreview(controller),
+          aspectRatio: cameraController.value.aspectRatio,
+          child: CameraPreview(cameraController),
         ),
         Align(
           alignment: Alignment.bottomCenter,
           child: Padding(
-            padding: EdgeInsets.all(16),
-            child: FloatingActionButton(
-              child: Icon(Icons.photo_camera),
+            padding: EdgeInsets.all(24),
+            child: TakePictureFAB(
               onPressed: () {
-                controller.takePicture().then((xfile) async {
+                cameraController.takePicture().then((xfile) async {
                   final visionImage = FirebaseVisionImage.fromFilePath(xfile.path);
-                  final cloudTextRecognizer = FirebaseVision.instance.cloudTextRecognizer();
+                  // Both cloudTextRecognizer and cloudDocumentTextRecognizer could be used
+                  // Requires testing to see which provides more reliable results
+                  final cloudTextRecognizer = FirebaseVision.instance
+                      .cloudDocumentTextRecognizer(CloudDocumentRecognizerOptions(hintedLanguages: ['en', 'de']));
                   final visionText = await cloudTextRecognizer.processImage(visionImage);
-
                   String text = visionText.text;
-                  // for (TextBlock block in visionText.blocks) {
-                  //   final Rect boundingBox = block.boundingBox;
-                  //   final List<Offset> cornerPoints = block.cornerPoints;
-                  //   final String text = block.text;
-                  //   final List<RecognizedLanguage> languages = block.recognizedLanguages;
-                  //
-                  //   for (TextLine line in block.lines) {
-                  //     // Same getters as TextBlock
-                  //     for (TextElement element in line.elements) {
-                  //       // Same getters as TextBlock
-                  //     }
-                  //   }
-                  // }
+                  try {
+                    File(xfile.path).deleteSync();
+                  } catch (exception) {
+                    print(exception);
+                  }
 
                   cloudTextRecognizer.close();
                   Fluttertoast.showToast(
@@ -113,6 +107,34 @@ class _CameraAppState extends State<CameraApp> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class TakePictureFAB extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const TakePictureFAB({
+    Key key,
+    @required this.onPressed,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return FloatingActionButton(
+      backgroundColor: Colors.transparent,
+      shape: CircleBorder(
+        side: BorderSide(
+          width: 4,
+          color: Theme.of(context).accentColor,
+        ),
+      ),
+      elevation: 0,
+      child: Container(
+        margin: EdgeInsets.all(8),
+        decoration: BoxDecoration(shape: BoxShape.circle, color: Theme.of(context).accentColor),
+      ),
+      onPressed: onPressed,
     );
   }
 }
