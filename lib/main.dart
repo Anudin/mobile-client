@@ -4,8 +4,10 @@ import 'package:firebase_ml_vision/firebase_ml_vision.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:fluttertoast/fluttertoast.dart';
+import 'package:mobile/util.dart';
 import 'package:wakelock/wakelock.dart';
+
+import 'alias.dart';
 
 List<CameraDescription> cameras;
 
@@ -18,27 +20,92 @@ Future<void> main() async {
   }
   runApp(
     MaterialApp(
-      home: CameraScreen(),
+      home: MainScreen(),
     ),
   );
 }
 
-class CameraScreen extends StatelessWidget {
+class MainScreen extends StatefulWidget {
+  @override
+  _MainScreenState createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  int _selected = 0;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(),
-      body: CameraApp(),
+      body: [CameraView(), AliasMasterView()][_selected],
+      bottomNavigationBar: BottomNavigationBar(
+        onTap: (index) {
+          setState(() {
+            _selected = index;
+          });
+        },
+        currentIndex: _selected,
+        items: [
+          BottomNavigationBarItem(icon: Icon(Icons.photo_camera), label: "Erfassen"),
+          BottomNavigationBarItem(icon: Icon(Icons.bookmark_border), label: "Aliasse")
+        ],
+      ),
     );
   }
 }
 
-class CameraApp extends StatefulWidget {
+class AliasMasterView extends StatelessWidget {
+  final aliasses = [
+    Alias('google', 'https://www.google.com'),
+    Alias('reddit', 'https://www.reddit.com'),
+    Alias('rickroll', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', '420s')
+  ];
+
   @override
-  _CameraAppState createState() => _CameraAppState();
+  Widget build(BuildContext context) {
+    return Container(
+      child: ListView(
+          children: aliasses
+              .map(
+                (alias) => ListTile(
+                  title: Text(alias.alias),
+                  subtitle: Text(alias.URL),
+                  trailing: Text(alias.position ?? ''),
+                  onTap: () async {
+                    final result = await Navigator.of(context)
+                        .push(MaterialPageRoute(builder: (context) => AliasDetailView(alias)));
+                    print(result);
+                  },
+                ),
+              )
+              .toList()),
+    );
+  }
 }
 
-class _CameraAppState extends State<CameraApp> {
+class AliasDetailView extends StatelessWidget {
+  final Alias alias;
+
+  AliasDetailView(this.alias);
+
+  @override
+  Widget build(BuildContext context) {
+    return WillPopScope(
+      // Ensure that the edited instance is returned, even is the back button is used
+      onWillPop: () async {
+        Navigator.of(context).pop(alias);
+        return false;
+      },
+      child: SizedBox.shrink(),
+    );
+  }
+}
+
+class CameraView extends StatefulWidget {
+  @override
+  _CameraViewState createState() => _CameraViewState();
+}
+
+class _CameraViewState extends State<CameraView> {
   CameraController cameraController;
 
   @override
@@ -92,15 +159,7 @@ class _CameraAppState extends State<CameraApp> {
                   }
 
                   cloudTextRecognizer.close();
-                  Fluttertoast.showToast(
-                      msg: text,
-                      toastLength: Toast.LENGTH_SHORT,
-                      gravity: ToastGravity.BOTTOM,
-                      timeInSecForIosWeb: 1,
-                      backgroundColor: Colors.red,
-                      textColor: Colors.white,
-                      fontSize: 16.0
-                  );
+                  showDevToast(text);
                 });
               },
             ),
