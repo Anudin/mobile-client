@@ -1,6 +1,7 @@
 import 'package:built_collection/built_collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:mobile/link.dart';
 
 class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
   AliasCubit() : super(BuiltMap());
@@ -32,6 +33,16 @@ class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
     emit(
       state.rebuild((builder) => builder.remove(alias.name)),
     );
+  }
+
+  Target resolve(Link link) {
+    final alias = state[link.prefix ?? '' + link.alias];
+    if (alias != null) {
+      final position = link.position ?? alias.position;
+      return Target(alias.URL, position);
+    } else {
+      return null;
+    }
   }
 
   @override
@@ -93,5 +104,18 @@ class Alias {
     if (position != null) json.addAll({'position': position});
     print('Alias encoded: $json');
     return json;
+  }
+}
+
+@immutable
+class Target {
+  final String URL;
+  final String position;
+
+  Target(this.URL, [this.position]);
+
+  @override
+  String toString() {
+    return 'URL: $URL,\nPosition: $position';
   }
 }

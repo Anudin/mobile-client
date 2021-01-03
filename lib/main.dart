@@ -191,7 +191,15 @@ class _AliasDetailViewState extends State<AliasDetailView> {
                 ),
                 TextFormField(
                   controller: _positionEditingController,
-                  decoration: InputDecoration(labelText: 'Position'),
+                  decoration: InputDecoration(
+                    labelText: 'Position',
+                    prefixText: '# ',
+                    prefixStyle: TextStyle(
+                      fontSize: 16,
+                      color: Colors.black54,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   validator: (text) => !Alias.isValidPosition(text) ? 'Position has invalid format.' : null,
                 ),
                 Spacer(),
@@ -298,6 +306,7 @@ class _CameraViewState extends State<CameraView> {
     if (!cameraController.value.isInitialized) {
       return Container();
     }
+    final aliasCubit = BlocProvider.of<AliasCubit>(context);
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -337,10 +346,17 @@ class _CameraViewState extends State<CameraView> {
                         fontSize: 16.0,
                       );
                     } else {
-                      // FIXME Resolve link (remember to count in prefix!)
-                      print(link.prefix);
-                      print(link.alias);
-                      print(link.position);
+                      final target = aliasCubit.resolve(link);
+                      if (target == null) {
+                        Fluttertoast.showToast(
+                          msg: 'Kein passender Alias.\nGelesen wurde: $ocrText',
+                          toastLength: Toast.LENGTH_LONG,
+                          gravity: ToastGravity.BOTTOM,
+                          fontSize: 16.0,
+                        );
+                      } else {
+                        print(target);
+                      }
                     }
                   }
                   try {

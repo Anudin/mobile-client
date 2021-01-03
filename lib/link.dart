@@ -18,12 +18,12 @@ class Link {
     // Contains a prefix
     if (p1.length == 2) {
       final p2 = _extractValidPosition(p1[0]);
-      return Link(p2[0], p1[0], p2.length == 2 ? p2[1] : null);
+      return Link(p2[0], p1[0], p2.length == 2 ? p2[1].substring(1) : null);
     }
     // Contains no prefix
     else if (p1.length == 1) {
       final p2 = _extractValidPosition(p1[0]);
-      return Link(p2[0], null, p2.length == 2 ? p2[1] : null);
+      return Link(p2[0], null, p2.length == 2 ? p2[1].substring(1) : null);
     }
     // Malformed
     else {
