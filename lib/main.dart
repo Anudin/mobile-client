@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:io' hide Link;
 import 'package:built_collection/built_collection.dart';
 import 'package:firebase_ml_vision/firebase_ml_vision.dart';
 import 'package:flutter/foundation.dart';
@@ -14,6 +14,7 @@ import 'package:wakelock/wakelock.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
 import 'alias.dart';
+import 'link.dart';
 
 List<CameraDescription> cameras;
 
@@ -323,10 +324,24 @@ class _CameraViewState extends State<CameraView> {
                     // Requires testing to see which provides more reliable results
                     final cloudTextRecognizer = FirebaseVision.instance
                         .cloudDocumentTextRecognizer(CloudDocumentRecognizerOptions(hintedLanguages: ['en', 'de']));
-                    final visionText = await cloudTextRecognizer.processImage(visionImage);
-                    String text = visionText.text;
+                    // FIXME Handle multiple detected lines
+                    // Remove leading or trailing white space - artifacts from OCR
+                    final ocrText = (await cloudTextRecognizer.processImage(visionImage)).text.trim();
                     cloudTextRecognizer.close();
-                    showDevToast(text);
+                    final link = Link.tryParse(ocrText);
+                    if (link == null) {
+                      Fluttertoast.showToast(
+                        msg: 'Der Link enthält Fehler.\nGelesen wurde: $ocrText',
+                        toastLength: Toast.LENGTH_LONG,
+                        gravity: ToastGravity.BOTTOM,
+                        fontSize: 16.0,
+                      );
+                    } else {
+                      // FIXME Resolve link (remember to count in prefix!)
+                      print(link.prefix);
+                      print(link.alias);
+                      print(link.position);
+                    }
                   }
                   try {
                     File(imageXfile.path).deleteSync();
