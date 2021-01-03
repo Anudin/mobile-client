@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:mobile/util.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:wakelock/wakelock.dart';
@@ -264,6 +265,7 @@ class _AliasDetailViewState extends State<AliasDetailView> {
   }
 }
 
+// TODO Add UI control for flash
 class CameraView extends StatefulWidget {
   @override
   _CameraViewState createState() => _CameraViewState();
@@ -308,8 +310,14 @@ class _CameraViewState extends State<CameraView> {
             padding: EdgeInsets.all(16),
             child: TakePictureFAB(
               onPressed: () {
-                cameraController.takePicture().then((xfile) async {
-                  final visionImage = FirebaseVisionImage.fromFilePath(xfile.path);
+                cameraController.takePicture().then((imageXfile) async {
+                  File croppedImage = await ImageCropper.cropImage(
+                      sourcePath: imageXfile.path,
+                      compressQuality: 100,
+                      compressFormat: ImageCompressFormat.png,
+                      aspectRatioPresets: [CropAspectRatioPreset.ratio16x9],
+                      androidUiSettings: AndroidUiSettings(hideBottomControls: true));
+                  final visionImage = FirebaseVisionImage.fromFilePath(croppedImage.path);
                   // Both cloudTextRecognizer and cloudDocumentTextRecognizer could be used
                   // Requires testing to see which provides more reliable results
                   final cloudTextRecognizer = FirebaseVision.instance
@@ -317,7 +325,8 @@ class _CameraViewState extends State<CameraView> {
                   final visionText = await cloudTextRecognizer.processImage(visionImage);
                   String text = visionText.text;
                   try {
-                    File(xfile.path).deleteSync();
+                    File(imageXfile.path).deleteSync();
+                    croppedImage.deleteSync();
                   } catch (exception) {
                     print(exception);
                   }
