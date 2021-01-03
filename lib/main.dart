@@ -317,21 +317,23 @@ class _CameraViewState extends State<CameraView> {
                       compressFormat: ImageCompressFormat.png,
                       aspectRatioPresets: [CropAspectRatioPreset.ratio16x9],
                       androidUiSettings: AndroidUiSettings(hideBottomControls: true));
-                  final visionImage = FirebaseVisionImage.fromFilePath(croppedImage.path);
-                  // Both cloudTextRecognizer and cloudDocumentTextRecognizer could be used
-                  // Requires testing to see which provides more reliable results
-                  final cloudTextRecognizer = FirebaseVision.instance
-                      .cloudDocumentTextRecognizer(CloudDocumentRecognizerOptions(hintedLanguages: ['en', 'de']));
-                  final visionText = await cloudTextRecognizer.processImage(visionImage);
-                  String text = visionText.text;
+                  if (croppedImage != null) {
+                    final visionImage = FirebaseVisionImage.fromFilePath(croppedImage.path);
+                    // Both cloudTextRecognizer and cloudDocumentTextRecognizer could be used
+                    // Requires testing to see which provides more reliable results
+                    final cloudTextRecognizer = FirebaseVision.instance
+                        .cloudDocumentTextRecognizer(CloudDocumentRecognizerOptions(hintedLanguages: ['en', 'de']));
+                    final visionText = await cloudTextRecognizer.processImage(visionImage);
+                    String text = visionText.text;
+                    cloudTextRecognizer.close();
+                    showDevToast(text);
+                  }
                   try {
                     File(imageXfile.path).deleteSync();
                     croppedImage.deleteSync();
                   } catch (exception) {
-                    print(exception);
+                    print('Couldn\'t delete temporary file: $exception');
                   }
-                  cloudTextRecognizer.close();
-                  showDevToast(text);
                 });
               },
             ),
