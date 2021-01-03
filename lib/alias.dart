@@ -1,44 +1,63 @@
 import 'package:built_collection/built_collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
-import 'package:uuid/uuid.dart';
 
 class AliasCubit extends Cubit<BuiltMap<String, Alias>> {
-  final uuidGenerator = Uuid();
-
   AliasCubit() : super(BuiltMap());
 
-  String create(Alias alias) {
-    final uuid = uuidGenerator.v4();
-    emit(
-      state.rebuild((builder) => builder.addAll({uuid: alias})),
-    );
-    return uuid;
+  bool isAvailable(String name) {
+    return !state.containsKey(name);
   }
 
-  void update(String uuid, Alias alias) {
+  void create(Alias alias) {
+    assert(isAvailable(alias.name));
     emit(
-      state.rebuild((builder) => builder[uuid] = alias),
+      state.rebuild((builder) => builder.addAll({alias.name: alias})),
     );
   }
 
-  void delete(String uuid) {
+  void update(Alias alias, Alias update) {
+    assert(isAvailable(alias.name));
     emit(
-      state.rebuild((builder) => builder.remove(uuid)),
+      state.rebuild((builder) {
+        if (alias.name != update.name) builder.remove(alias.name);
+        builder[update.name] = update;
+      }),
+    );
+  }
+
+  void delete(Alias alias) {
+    emit(
+      state.rebuild((builder) => builder.remove(alias.name)),
     );
   }
 }
 
 @immutable
 class Alias {
-  final String alias;
+  final String name;
   final String URL;
   final String position;
 
-  Alias(this.alias, this.URL, [this.position]);
+  Alias(this.name, this.URL, [this.position]);
 
-  Alias copyWith({String alias, String URL, String position}) => Alias(
-        alias ?? this.alias,
+  static bool isValidName(String alias) {
+    // TODO Implementation
+    return true;
+  }
+
+  static bool isValidURL(String URL) {
+    // TODO Implementation
+    return true;
+  }
+
+  static bool isValidPosition(String position) {
+    // TODO Implementation
+    return true;
+  }
+
+  Alias copyWith({String name, String URL, String position}) => Alias(
+        name ?? this.name,
         URL ?? this.URL,
         position ?? this.position,
       );

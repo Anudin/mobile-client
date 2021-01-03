@@ -86,9 +86,9 @@ class AliasMasterView extends StatelessWidget {
     return BlocBuilder<AliasCubit, BuiltMap<String, Alias>>(
       builder: (context, state) => ListView(
         children: [
-          for (var uuid in state.keys)
+          for (var alias in state.keys)
             Dismissible(
-              key: Key(uuid),
+              key: Key(alias),
               background: Container(
                 color: Colors.black12,
                 padding: EdgeInsets.only(left: 16),
@@ -97,18 +97,18 @@ class AliasMasterView extends StatelessWidget {
               ),
               direction: DismissDirection.startToEnd,
               onDismissed: (direction) {
-                aliasCubit.delete(uuid);
+                aliasCubit.delete(state[alias]);
               },
               child: ListTile(
-                title: Text(state[uuid].alias),
+                title: Text(state[alias].name),
                 // TODO Shorten URL: remove http[s]://www. and limit length, if necessary add ...
-                subtitle: Text(state[uuid].URL),
-                trailing: Text(state[uuid].position ?? ''),
+                subtitle: Text(state[alias].URL),
+                trailing: Text(state[alias].position ?? ''),
                 onTap: () async {
                   // TODO Give feedback
                   final update = await Navigator.of(context)
-                      .push(MaterialPageRoute(builder: (context) => AliasDetailView(alias: state[uuid])));
-                  if (update != null) aliasCubit.update(uuid, update);
+                      .push(MaterialPageRoute(builder: (context) => AliasDetailView(alias: state[alias])));
+                  if (update != null) aliasCubit.update(state[alias], update);
                 },
               ),
             )
@@ -129,21 +129,21 @@ class AliasDetailView extends StatefulWidget {
 
 class _AliasDetailViewState extends State<AliasDetailView> {
   final _formKey = GlobalKey<FormState>();
-  TextEditingController _aliasEditingController;
+  TextEditingController _nameEditingController;
   TextEditingController _URLEditingController;
   TextEditingController _positionEditingController;
 
   @override
   void initState() {
     super.initState();
-    _aliasEditingController = TextEditingController(text: widget.alias.alias);
+    _nameEditingController = TextEditingController(text: widget.alias.name);
     _URLEditingController = TextEditingController(text: widget.alias.URL);
     _positionEditingController = TextEditingController(text: widget.alias.position);
   }
 
   @override
   void dispose() {
-    _aliasEditingController.dispose();
+    _nameEditingController.dispose();
     _URLEditingController.dispose();
     _positionEditingController.dispose();
     super.dispose();
@@ -153,6 +153,7 @@ class _AliasDetailViewState extends State<AliasDetailView> {
 
   @override
   Widget build(BuildContext context) {
+    final aliasCubit = BlocProvider.of<AliasCubit>(context);
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -170,20 +171,24 @@ class _AliasDetailViewState extends State<AliasDetailView> {
             child: Column(
               children: [
                 TextFormField(
-                  decoration: InputDecoration(labelText: 'Alias'),
-                  controller: _aliasEditingController,
-                  validator: (text) => null,
+                  decoration: InputDecoration(labelText: 'Name'),
+                  controller: _nameEditingController,
+                  validator: (text) => !Alias.isValidName(text)
+                      ? 'Name has invalid format.'
+                      : !aliasCubit.isAvailable(text)
+                          ? 'An alias with the given name already exists.'
+                          : null,
                 ),
                 TextFormField(
                   controller: _URLEditingController,
                   decoration: InputDecoration(labelText: 'URL'),
                   maxLines: null,
-                  validator: (text) => null,
+                  validator: (text) => !Alias.isValidURL(text) ? 'URL has invalid format.' : null,
                 ),
                 TextFormField(
                   controller: _positionEditingController,
                   decoration: InputDecoration(labelText: 'Position'),
-                  validator: (text) => null,
+                  validator: (text) => !Alias.isValidPosition(text) ? 'Position has invalid format.' : null,
                 ),
                 Spacer(),
                 Row(
@@ -211,17 +216,16 @@ class _AliasDetailViewState extends State<AliasDetailView> {
   }
 
   bool _hasChanges() =>
-      widget.alias.alias != _aliasEditingController.text ||
+      widget.alias.name != _nameEditingController.text ||
       widget.alias.URL != _URLEditingController.text ||
       (widget.alias.position ?? '') != _positionEditingController.text;
 
   void _onConfirmChanges() {
     if (_hasChanges()) {
-      // FIXME Implement validators
       final hasValidChanges = _formKey.currentState.validate();
       if (hasValidChanges) {
         Navigator.of(context).pop(Alias(
-          _aliasEditingController.text,
+          _nameEditingController.text,
           _URLEditingController.text,
           _positionEditingController.text != '' ? _positionEditingController.text : null,
         ));
