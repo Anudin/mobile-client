@@ -177,7 +177,7 @@ class _AliasDetailViewState extends State<AliasDetailView> {
                   controller: _nameEditingController,
                   validator: (text) => !Alias.isValidName(text)
                       ? 'Name has invalid format.'
-                      : !aliasCubit.isAvailable(text)
+                      : text != widget.alias.name && !aliasCubit.isAvailable(text)
                           ? 'An alias with the given name already exists.'
                           : null,
                 ),

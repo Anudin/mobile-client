@@ -10,6 +10,8 @@ class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
   }
 
   void create(Alias alias) {
+    // Validation logic should probably be handled outside of the data class
+    assert(Alias.isValidName(alias.name) && Alias.isValidURL(alias.URL) && Alias.isValidPosition(alias.position));
     assert(isAvailable(alias.name));
     emit(
       state.rebuild((builder) => builder.addAll({alias.name: alias})),
@@ -17,7 +19,7 @@ class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
   }
 
   void update(Alias alias, Alias update) {
-    assert(isAvailable(alias.name));
+    assert(alias.name == update.name || isAvailable(alias.name));
     emit(
       state.rebuild((builder) {
         if (alias.name != update.name) builder.remove(alias.name);
