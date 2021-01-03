@@ -6,7 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:mobile/util.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:wakelock/wakelock.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
@@ -18,17 +20,16 @@ List<CameraDescription> cameras;
 // FIXME Handle camera lifecycle, see https://pub.dev/packages/camera#handling-lifecycle-states
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final aliasCubit = AliasCubit();
-  aliasCubit.create(Alias('google', 'https://www.google.com'));
-  aliasCubit.create(Alias('reddit', 'https://www.reddit.com'));
-  aliasCubit.create(Alias('rickroll', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', '420s'));
   cameras = await availableCameras();
   if (!kReleaseMode) {
     Wakelock.enable();
   }
+  HydratedBloc.storage = await HydratedStorage.build(
+    storageDirectory: await getApplicationSupportDirectory(),
+  );
   runApp(
-    BlocProvider.value(
-      value: aliasCubit,
+    BlocProvider(
+      create: (context) => AliasCubit(),
       child: MaterialApp(
         home: MainScreen(),
       ),
@@ -118,6 +119,7 @@ class AliasMasterView extends StatelessWidget {
   }
 }
 
+// TODO Disable keyboard correction
 class AliasDetailView extends StatefulWidget {
   final Alias alias;
 

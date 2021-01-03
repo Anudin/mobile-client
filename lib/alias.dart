@@ -2,7 +2,7 @@ import 'package:built_collection/built_collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 
-class AliasCubit extends Cubit<BuiltMap<String, Alias>> {
+class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
   AliasCubit() : super(BuiltMap());
 
   bool isAvailable(String name) {
@@ -31,6 +31,22 @@ class AliasCubit extends Cubit<BuiltMap<String, Alias>> {
       state.rebuild((builder) => builder.remove(alias.name)),
     );
   }
+
+  @override
+  BuiltMap<String, Alias> fromJson(Map<String, dynamic> json) {
+    final state = BuiltMap.of(
+      json.map((key, value) => MapEntry(key, Alias.fromJson(value))).cast<String, Alias>(),
+    );
+    print('State restored: $state');
+    return state;
+  }
+
+  @override
+  Map<String, dynamic> toJson(BuiltMap<String, Alias> state) {
+    final json = state.map((key, value) => MapEntry(key, value.toJson())).toMap().cast<String, dynamic>();
+    print('State encoded: $json');
+    return json;
+  }
 }
 
 @immutable
@@ -40,6 +56,11 @@ class Alias {
   final String position;
 
   Alias(this.name, this.URL, [this.position]);
+
+  Alias.fromJson(Map<String, dynamic> json)
+      : name = json['name'].toString(),
+        URL = json['URL'].toString(),
+        position = json['position']?.toString();
 
   static bool isValidName(String alias) {
     // TODO Implementation
@@ -61,4 +82,14 @@ class Alias {
         URL ?? this.URL,
         position ?? this.position,
       );
+
+  Map<String, dynamic> toJson() {
+    final json = {
+      'name': name,
+      'URL': URL,
+    };
+    if (position != null) json.addAll({'position': position});
+    print('Alias encoded: $json');
+    return json;
+  }
 }
