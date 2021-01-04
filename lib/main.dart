@@ -201,7 +201,9 @@ class _AliasDetailViewState extends State<AliasDetailView> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  validator: (text) => !Alias.isValidPosition(text) ? 'Position has invalid format.' : null,
+
+                  validator: (text) =>
+                      text.isNotEmpty && !Alias.isValidPosition(text) ? 'Position has invalid format.' : null,
                 ),
                 Spacer(),
                 Row(
