@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' hide Link;
+import 'package:bonsoir/bonsoir.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:firebase_ml_vision/firebase_ml_vision.dart';
 import 'package:flutter/foundation.dart';
@@ -12,24 +14,33 @@ import 'package:mobile/util.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:wakelock/wakelock.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:http/http.dart' as http;
 
 import 'alias.dart';
 import 'link.dart';
 
-List<CameraDescription> cameras;
+List<CameraDescription> _cameras;
+
+// FIXME Offer static configuration as fail safe
+BonsoirDiscovery _discovery;
+StreamSubscription<BonsoirDiscoveryEvent> _discoverySubscription;
+final String _externalViewerServiceName = 'com external desktop';
+String _externalViewerIP;
+String _externalViewerPort;
 
 // TODO Consistent handling of string sanitization from OCR artifacts
 // FIXME Alias persistence - UIDs, data order vs sorting order
 // FIXME Handle camera lifecycle, see https://pub.dev/packages/camera#handling-lifecycle-states
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  cameras = await availableCameras();
-  if (!kReleaseMode) {
-    Wakelock.enable();
-  }
   HydratedBloc.storage = await HydratedStorage.build(
     storageDirectory: await getApplicationSupportDirectory(),
   );
+  await _startDiscovery();
+  _cameras = await availableCameras();
+  if (!kReleaseMode) {
+    Wakelock.enable();
+  }
   runApp(
     BlocProvider(
       create: (context) => AliasCubit(),
@@ -40,13 +51,65 @@ Future<void> main() async {
   );
 }
 
+Future<void> _startDiscovery() async {
+  if (_discovery == null || _discovery.isStopped) {
+    _discovery = BonsoirDiscovery(type: '_http._tcp.');
+    await _discovery.ready;
+  }
+  await _discovery.start();
+  _discoverySubscription = _discovery.eventStream.listen((event) {
+    if (event.type == BonsoirDiscoveryEventType.DISCOVERY_SERVICE_RESOLVED) {
+      if (event.service.name == _externalViewerServiceName) {
+        final service = event.service as ResolvedBonsoirService;
+        _externalViewerIP = service.ip;
+        _externalViewerPort = service.port.toString();
+        print('External viewer discovered on $_externalViewerIP, port $_externalViewerPort');
+      }
+    } else if (event.type == BonsoirDiscoveryEventType.DISCOVERY_SERVICE_LOST) {
+      if (event.service.name == _externalViewerServiceName) {
+        _externalViewerIP = null;
+        _externalViewerPort = null;
+        print('External viewer lost');
+      }
+    }
+  });
+}
+
 class MainScreen extends StatefulWidget {
   @override
   _MainScreenState createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _selected = 0;
+
+  @override
+  void initState() {
+    WidgetsBinding.instance.addObserver(this);
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        await _startDiscovery();
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        _discoverySubscription?.cancel();
+        _discoverySubscription = null;
+        _discovery?.stop();
+        break;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -201,7 +264,6 @@ class _AliasDetailViewState extends State<AliasDetailView> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-
                   validator: (text) =>
                       text.isNotEmpty && !Alias.isValidPosition(text) ? 'Position has invalid format.' : null,
                 ),
@@ -289,7 +351,7 @@ class _CameraViewState extends State<CameraView> {
   @override
   void initState() {
     super.initState();
-    cameraController = CameraController(cameras[0], ResolutionPreset.veryHigh);
+    cameraController = CameraController(_cameras[0], ResolutionPreset.veryHigh);
     cameraController.initialize().then((_) {
       if (!mounted) {
         return;
@@ -359,7 +421,15 @@ class _CameraViewState extends State<CameraView> {
                           fontSize: 16.0,
                         );
                       } else {
-                        print(target);
+                        print('Sending target to viewer ${jsonEncode(target)}');
+                        http.post(
+                          'http://$_externalViewerIP:$_externalViewerPort/open',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                          },
+                          body: jsonEncode(target),
+                        );
                       }
                     }
                   }

@@ -12,7 +12,9 @@ class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
 
   void create(Alias alias) {
     // Validation logic should probably be handled outside of the data class
-    assert(Alias.isValidName(alias.name) && Alias.isValidURL(alias.URL) && Alias.isValidPosition(alias.position));
+    assert(Alias.isValidName(alias.name) &&
+        Alias.isValidURL(alias.URL) &&
+        (alias.position == null || Alias.isValidPosition(alias.position)));
     assert(isAvailable(alias.name));
     emit(
       state.rebuild((builder) => builder.addAll({alias.name: alias})),
@@ -124,5 +126,12 @@ class Target {
   @override
   String toString() {
     return '(URL: $URL, position: $position)';
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'URL': URL,
+      'position': position,
+    };
   }
 }
