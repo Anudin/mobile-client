@@ -36,11 +36,16 @@ class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
   }
 
   Target resolve(Link link) {
+    print('Trying to resolve link $link');
     final alias = state[link.prefix ?? '' + link.alias];
     if (alias != null) {
       final position = link.position ?? alias.position;
-      return Target(alias.URL, position);
+      final target = Target(
+          alias.URL, Link.isValidTimestamp(position) ? '${Link.convertTimestampToSeconds(position)}s' : position);
+      print('Successfully resolved to $target');
+      return target;
     } else {
+      print('Failed to resolve $link');
       return null;
     }
   }
@@ -86,8 +91,7 @@ class Alias {
   }
 
   static bool isValidPosition(String position) {
-    // TODO Implementation
-    return true;
+    return Link.isValidPosition(position);
   }
 
   Alias copyWith({String name, String URL, String position}) => Alias(
@@ -110,12 +114,15 @@ class Alias {
 @immutable
 class Target {
   final String URL;
+
+  /// Either a plain number (page number), or a number with an appended 's' (time in seconds), no leading zeros.
+  static final RegExp positionFormat = RegExp('^[1-9]\\d*[s]?\$');
   final String position;
 
-  Target(this.URL, [this.position]);
+  Target(this.URL, [this.position]) : assert(position == null || positionFormat.hasMatch(position));
 
   @override
   String toString() {
-    return 'URL: $URL,\nPosition: $position';
+    return '(URL: $URL, position: $position)';
   }
 }

@@ -18,6 +18,7 @@ import 'link.dart';
 
 List<CameraDescription> cameras;
 
+// TODO Consistent handling of string sanitization from OCR artifacts
 // FIXME Alias persistence - UIDs, data order vs sorting order
 // FIXME Handle camera lifecycle, see https://pub.dev/packages/camera#handling-lifecycle-states
 Future<void> main() async {
@@ -336,6 +337,7 @@ class _CameraViewState extends State<CameraView> {
                     // FIXME Handle multiple detected lines
                     // Remove leading or trailing white space - artifacts from OCR
                     final ocrText = (await cloudTextRecognizer.processImage(visionImage)).text.trim();
+                    print('OCR recognized string: $ocrText');
                     cloudTextRecognizer.close();
                     final link = Link.tryParse(ocrText);
                     if (link == null) {
