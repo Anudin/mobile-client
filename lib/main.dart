@@ -22,10 +22,25 @@ import 'link.dart';
 List<CameraDescription> _cameras;
 ServiceDiscoveryCubit _serviceDiscovery;
 
+class BlocLogger extends BlocObserver {
+  @override
+  void onChange(Cubit cubit, Change change) {
+    print('${cubit.runtimeType} $change');
+    super.onChange(cubit, change);
+  }
+
+  @override
+  void onError(Cubit cubit, Object error, StackTrace stackTrace) {
+    print('${cubit.runtimeType} $error');
+    super.onError(cubit, error, stackTrace);
+  }
+}
+
 // TODO Consistent handling of string sanitization from OCR artifacts
 // FIXME Handle camera lifecycle, see https://pub.dev/packages/camera#handling-lifecycle-states
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  Bloc.observer = BlocLogger();
   HydratedBloc.storage = await HydratedStorage.build(
     storageDirectory: await getApplicationSupportDirectory(),
   );
@@ -420,7 +435,7 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
                               } else {
                                 assert(service != null);
                                 print('Sending target ${jsonEncode(target)} to viewer ${jsonEncode(service)}');
-                                http.post(
+                                final response = http.post(
                                   'http://${service.ip}:${service.port}/open',
                                   headers: {
                                     'Content-Type': 'application/json',
@@ -428,6 +443,17 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
                                   },
                                   body: jsonEncode(target),
                                 );
+                                response.then((response) {
+                                  final status = response?.statusCode ?? -1;
+                                  if (status >= 400) {
+                                    Fluttertoast.showToast(
+                                      msg: 'Die Übertragung zum Viewer ist fehlgeschlagen',
+                                      toastLength: Toast.LENGTH_LONG,
+                                      gravity: ToastGravity.BOTTOM,
+                                      fontSize: 16.0,
+                                    );
+                                  }
+                                });
                               }
                             }
                           }

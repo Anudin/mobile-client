@@ -23,10 +23,10 @@ class ServiceDiscoveryCubit extends Cubit<ResolvedBonsoirService> {
   // FIXME Could be called in parallel?
   Future<void> start() async {
     if (_discovery == null || _discovery.isStopped) {
+      emit(null);
       _discovery = BonsoirDiscovery(type: type);
       await _discovery.ready;
     }
-    emit(null);
     await _discovery.start();
     _discoverySubscription = _discovery.eventStream.listen((event) {
       if (event.type == BonsoirDiscoveryEventType.DISCOVERY_SERVICE_RESOLVED) {
