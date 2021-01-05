@@ -36,15 +36,8 @@ Future<void> main() async {
   runApp(
     MultiBlocProvider(
       providers: [
-        BlocProvider(
-          create: (context) {
-            _serviceDiscovery = ServiceDiscoveryCubit(type: '_http._tcp.');
-            return _serviceDiscovery;
-          },
-        ),
-        BlocProvider(
-          create: (context) => AliasCubit(),
-        )
+        BlocProvider(create: (context) => _serviceDiscovery = ServiceDiscoveryCubit(type: '_http._tcp.')),
+        BlocProvider(create: (context) => AliasCubit())
       ],
       child: MaterialApp(
         home: MainScreen(),
@@ -63,8 +56,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   @override
   void initState() {
-    WidgetsBinding.instance.addObserver(this);
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
@@ -321,14 +314,19 @@ class CameraView extends StatefulWidget {
   _CameraViewState createState() => _CameraViewState();
 }
 
-class _CameraViewState extends State<CameraView> {
-  CameraController cameraController;
+class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
+  CameraController _cameraController;
 
   @override
   void initState() {
     super.initState();
-    cameraController = CameraController(_cameras[0], ResolutionPreset.veryHigh);
-    cameraController.initialize().then((_) {
+    WidgetsBinding.instance.addObserver(this);
+    _initializeCameraController();
+  }
+
+  Future<void> _initializeCameraController() {
+    _cameraController = CameraController(_cameras[0], ResolutionPreset.high);
+    return _cameraController.initialize().then((_) {
       if (!mounted) {
         return;
       }
@@ -338,13 +336,27 @@ class _CameraViewState extends State<CameraView> {
 
   @override
   void dispose() {
-    cameraController?.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _cameraController?.dispose();
     super.dispose();
   }
 
   @override
+  Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
+    if (_cameraController == null || !_cameraController.value.isInitialized) {
+      return;
+    }
+    if (state == AppLifecycleState.inactive) {
+      _cameraController?.dispose();
+    } else if (state == AppLifecycleState.resumed) {
+      _cameraController.debugCheckIsDisposed();
+      _initializeCameraController();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (!cameraController.value.isInitialized) {
+    if (!_cameraController.value.isInitialized) {
       return Container();
     }
     final aliasCubit = BlocProvider.of<AliasCubit>(context);
@@ -352,8 +364,8 @@ class _CameraViewState extends State<CameraView> {
       fit: StackFit.expand,
       children: [
         AspectRatio(
-          aspectRatio: cameraController.value.aspectRatio,
-          child: CameraPreview(cameraController),
+          aspectRatio: _cameraController.value.aspectRatio,
+          child: CameraPreview(_cameraController),
         ),
         Align(
           alignment: Alignment.bottomCenter,
@@ -364,24 +376,30 @@ class _CameraViewState extends State<CameraView> {
                 onPressed: service == null
                     ? null
                     : () {
-                        cameraController.takePicture().then((imageXfile) async {
+                        _cameraController.takePicture().then((imageXFile) async {
                           File croppedImage = await ImageCropper.cropImage(
-                              sourcePath: imageXfile.path,
-                              compressQuality: 100,
+                              sourcePath: imageXFile.path,
                               compressFormat: ImageCompressFormat.png,
                               aspectRatioPresets: [CropAspectRatioPreset.ratio16x9],
                               androidUiSettings: AndroidUiSettings(hideBottomControls: true));
                           if (croppedImage != null) {
-                            final visionImage = FirebaseVisionImage.fromFilePath(croppedImage.path);
-                            // Both cloudTextRecognizer and cloudDocumentTextRecognizer could be used
-                            // Requires testing to see which provides more reliable results
-                            final cloudTextRecognizer = FirebaseVision.instance.cloudDocumentTextRecognizer(
-                                CloudDocumentRecognizerOptions(hintedLanguages: ['en', 'de']));
-                            // FIXME Handle multiple detected lines
-                            // Remove leading or trailing white space - artifacts from OCR
-                            final ocrText = (await cloudTextRecognizer.processImage(visionImage)).text.trim();
+                            var ocrText = '';
+                            DocumentTextRecognizer textRecognizer;
+                            try {
+                              // FIXME Handle multiple detected lines
+                              // Both cloudTextRecognizer and cloudDocumentTextRecognizer could be used
+                              // Requires testing to see which provides more reliable results
+                              textRecognizer = FirebaseVision.instance.cloudDocumentTextRecognizer(
+                                  CloudDocumentRecognizerOptions(hintedLanguages: ['en', 'de']));
+                              final visionImage = FirebaseVisionImage.fromFilePath(croppedImage.path);
+                              // Remove leading or trailing white space - artifacts from OCR
+                              ocrText = (await textRecognizer.processImage(visionImage)).text.trim();
+                            } catch (e) {
+                              print(e);
+                            } finally {
+                              textRecognizer?.close();
+                            }
                             print('OCR recognized string: $ocrText');
-                            cloudTextRecognizer.close();
                             final link = Link.tryParse(ocrText);
                             if (link == null) {
                               Fluttertoast.showToast(
@@ -401,9 +419,9 @@ class _CameraViewState extends State<CameraView> {
                                 );
                               } else {
                                 assert(service != null);
-                                print('Sending target to viewer ${jsonEncode(target)}');
+                                print('Sending target ${jsonEncode(target)} to viewer ${jsonEncode(service)}');
                                 http.post(
-                                  'http://$service.ip:$service.port/open',
+                                  'http://${service.ip}:${service.port}/open',
                                   headers: {
                                     'Content-Type': 'application/json',
                                     'Accept': 'application/json',
@@ -414,7 +432,7 @@ class _CameraViewState extends State<CameraView> {
                             }
                           }
                           try {
-                            File(imageXfile.path).deleteSync();
+                            File(imageXFile.path).deleteSync();
                             croppedImage.deleteSync();
                           } catch (exception) {
                             print('Couldn\'t delete temporary file: $exception');

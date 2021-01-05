@@ -22,7 +22,8 @@ class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
   }
 
   void update(Alias alias, Alias update) {
-    assert(alias.name == update.name || isAvailable(alias.name));
+    print(isAvailable(alias.name));
+    assert(alias.name == update.name || isAvailable(update.name));
     emit(
       state.rebuild((builder) {
         if (alias.name != update.name) builder.remove(alias.name);
@@ -84,12 +85,12 @@ class Alias {
 
   static bool isValidName(String alias) {
     // TODO Implementation
-    return true;
+    return alias.isNotEmpty;
   }
 
   static bool isValidURL(String URL) {
     // TODO Implementation
-    return true;
+    return URL.isNotEmpty;
   }
 
   static bool isValidPosition(String position) {
