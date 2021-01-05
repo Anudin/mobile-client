@@ -37,7 +37,7 @@ class BlocLogger extends BlocObserver {
 }
 
 // TODO Consistent handling of string sanitization from OCR artifacts
-// FIXME Handle camera lifecycle, see https://pub.dev/packages/camera#handling-lifecycle-states
+// FIXME Fix orientation, especially in cropping view
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   Bloc.observer = BlocLogger();
@@ -402,20 +402,18 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
                             DocumentTextRecognizer textRecognizer;
                             try {
                               // FIXME Handle multiple detected lines
-                              // Both cloudTextRecognizer and cloudDocumentTextRecognizer could be used
-                              // Requires testing to see which provides more reliable results
-                              textRecognizer = FirebaseVision.instance.cloudDocumentTextRecognizer(
-                                  CloudDocumentRecognizerOptions(hintedLanguages: ['en', 'de']));
+                              final textRecognizer = FirebaseVision.instance
+                                  .cloudTextRecognizer(CloudTextRecognizerOptions(hintedLanguages: ['en', 'de']));
                               final visionImage = FirebaseVisionImage.fromFilePath(croppedImage.path);
                               // Remove leading or trailing white space - artifacts from OCR
                               ocrText = (await textRecognizer.processImage(visionImage)).text.trim();
                             } catch (e) {
-                              print(e);
+                              print('An error occurred during text recognition $e');
                             } finally {
                               textRecognizer?.close();
                             }
                             print('OCR recognized string: $ocrText');
-                            final link = Link.tryParse(ocrText);
+                            final link = ocrText.isNotEmpty ? Link.tryParse(ocrText) : null;
                             if (link == null) {
                               Fluttertoast.showToast(
                                 msg: 'Der Link enthält Fehler.\nGelesen wurde: $ocrText',
