@@ -441,11 +441,19 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
                                   },
                                   body: jsonEncode(target),
                                 );
-                                response.then((response) {
+                                response.catchError((e) {
+                                  Fluttertoast.showToast(
+                                    msg: 'Die Verbindung mit dem Viewer ist gescheitert (${e.toString()}).',
+                                    toastLength: Toast.LENGTH_LONG,
+                                    gravity: ToastGravity.BOTTOM,
+                                    fontSize: 16.0,
+                                  );
+                                }).then((response) {
                                   final status = response?.statusCode ?? -1;
                                   if (status >= 400) {
                                     Fluttertoast.showToast(
-                                      msg: 'Die Übertragung zum Viewer ist fehlgeschlagen',
+                                      msg:
+                                          'Bei der Kommunikation mit dem Viewer ist ein Fehler aufgetreten, Statuscode $status.',
                                       toastLength: Toast.LENGTH_LONG,
                                       gravity: ToastGravity.BOTTOM,
                                       fontSize: 16.0,
