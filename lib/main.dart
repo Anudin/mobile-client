@@ -10,7 +10,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:image_cropper/image_cropper.dart';
-import 'package:mobile/util.dart';
+import 'package:mobile/discovery.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:wakelock/wakelock.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -20,59 +20,37 @@ import 'alias.dart';
 import 'link.dart';
 
 List<CameraDescription> _cameras;
-
-// FIXME Offer static configuration as fail safe
-BonsoirDiscovery _discovery;
-StreamSubscription<BonsoirDiscoveryEvent> _discoverySubscription;
-final String _externalViewerServiceName = 'com external desktop';
-String _externalViewerIP;
-String _externalViewerPort;
+ServiceDiscoveryCubit _serviceDiscovery;
 
 // TODO Consistent handling of string sanitization from OCR artifacts
-// FIXME Alias persistence - UIDs, data order vs sorting order
 // FIXME Handle camera lifecycle, see https://pub.dev/packages/camera#handling-lifecycle-states
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   HydratedBloc.storage = await HydratedStorage.build(
     storageDirectory: await getApplicationSupportDirectory(),
   );
-  await _startDiscovery();
   _cameras = await availableCameras();
   if (!kReleaseMode) {
     Wakelock.enable();
   }
   runApp(
-    BlocProvider(
-      create: (context) => AliasCubit(),
+    MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (context) {
+            _serviceDiscovery = ServiceDiscoveryCubit(type: '_http._tcp.');
+            return _serviceDiscovery;
+          },
+        ),
+        BlocProvider(
+          create: (context) => AliasCubit(),
+        )
+      ],
       child: MaterialApp(
         home: MainScreen(),
       ),
     ),
   );
-}
-
-Future<void> _startDiscovery() async {
-  if (_discovery == null || _discovery.isStopped) {
-    _discovery = BonsoirDiscovery(type: '_http._tcp.');
-    await _discovery.ready;
-  }
-  await _discovery.start();
-  _discoverySubscription = _discovery.eventStream.listen((event) {
-    if (event.type == BonsoirDiscoveryEventType.DISCOVERY_SERVICE_RESOLVED) {
-      if (event.service.name == _externalViewerServiceName) {
-        final service = event.service as ResolvedBonsoirService;
-        _externalViewerIP = service.ip;
-        _externalViewerPort = service.port.toString();
-        print('External viewer discovered on $_externalViewerIP, port $_externalViewerPort');
-      }
-    } else if (event.type == BonsoirDiscoveryEventType.DISCOVERY_SERVICE_LOST) {
-      if (event.service.name == _externalViewerServiceName) {
-        _externalViewerIP = null;
-        _externalViewerPort = null;
-        print('External viewer lost');
-      }
-    }
-  });
 }
 
 class MainScreen extends StatefulWidget {
@@ -92,6 +70,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _serviceDiscovery.stop();
     super.dispose();
   }
 
@@ -99,14 +78,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
     switch (state) {
       case AppLifecycleState.resumed:
-        await _startDiscovery();
+        await _serviceDiscovery.start();
         break;
       case AppLifecycleState.inactive:
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
-        _discoverySubscription?.cancel();
-        _discoverySubscription = null;
-        _discovery?.stop();
+        await _serviceDiscovery.stop();
         break;
     }
   }
@@ -145,7 +122,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 }
 
-// TODO Undo dismiss, insert in same position?
 class AliasMasterView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -383,64 +359,69 @@ class _CameraViewState extends State<CameraView> {
           alignment: Alignment.bottomCenter,
           child: Padding(
             padding: EdgeInsets.all(16),
-            child: TakePictureFAB(
-              onPressed: () {
-                cameraController.takePicture().then((imageXfile) async {
-                  File croppedImage = await ImageCropper.cropImage(
-                      sourcePath: imageXfile.path,
-                      compressQuality: 100,
-                      compressFormat: ImageCompressFormat.png,
-                      aspectRatioPresets: [CropAspectRatioPreset.ratio16x9],
-                      androidUiSettings: AndroidUiSettings(hideBottomControls: true));
-                  if (croppedImage != null) {
-                    final visionImage = FirebaseVisionImage.fromFilePath(croppedImage.path);
-                    // Both cloudTextRecognizer and cloudDocumentTextRecognizer could be used
-                    // Requires testing to see which provides more reliable results
-                    final cloudTextRecognizer = FirebaseVision.instance
-                        .cloudDocumentTextRecognizer(CloudDocumentRecognizerOptions(hintedLanguages: ['en', 'de']));
-                    // FIXME Handle multiple detected lines
-                    // Remove leading or trailing white space - artifacts from OCR
-                    final ocrText = (await cloudTextRecognizer.processImage(visionImage)).text.trim();
-                    print('OCR recognized string: $ocrText');
-                    cloudTextRecognizer.close();
-                    final link = Link.tryParse(ocrText);
-                    if (link == null) {
-                      Fluttertoast.showToast(
-                        msg: 'Der Link enthält Fehler.\nGelesen wurde: $ocrText',
-                        toastLength: Toast.LENGTH_LONG,
-                        gravity: ToastGravity.BOTTOM,
-                        fontSize: 16.0,
-                      );
-                    } else {
-                      final target = aliasCubit.resolve(link);
-                      if (target == null) {
-                        Fluttertoast.showToast(
-                          msg: 'Kein passender Alias.\nGelesen wurde: $ocrText',
-                          toastLength: Toast.LENGTH_LONG,
-                          gravity: ToastGravity.BOTTOM,
-                          fontSize: 16.0,
-                        );
-                      } else {
-                        print('Sending target to viewer ${jsonEncode(target)}');
-                        http.post(
-                          'http://$_externalViewerIP:$_externalViewerPort/open',
-                          headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                          },
-                          body: jsonEncode(target),
-                        );
-                      }
-                    }
-                  }
-                  try {
-                    File(imageXfile.path).deleteSync();
-                    croppedImage.deleteSync();
-                  } catch (exception) {
-                    print('Couldn\'t delete temporary file: $exception');
-                  }
-                });
-              },
+            child: BlocBuilder<ServiceDiscoveryCubit, ResolvedBonsoirService>(
+              builder: (context, service) => TakePictureFAB(
+                onPressed: service == null
+                    ? null
+                    : () {
+                        cameraController.takePicture().then((imageXfile) async {
+                          File croppedImage = await ImageCropper.cropImage(
+                              sourcePath: imageXfile.path,
+                              compressQuality: 100,
+                              compressFormat: ImageCompressFormat.png,
+                              aspectRatioPresets: [CropAspectRatioPreset.ratio16x9],
+                              androidUiSettings: AndroidUiSettings(hideBottomControls: true));
+                          if (croppedImage != null) {
+                            final visionImage = FirebaseVisionImage.fromFilePath(croppedImage.path);
+                            // Both cloudTextRecognizer and cloudDocumentTextRecognizer could be used
+                            // Requires testing to see which provides more reliable results
+                            final cloudTextRecognizer = FirebaseVision.instance.cloudDocumentTextRecognizer(
+                                CloudDocumentRecognizerOptions(hintedLanguages: ['en', 'de']));
+                            // FIXME Handle multiple detected lines
+                            // Remove leading or trailing white space - artifacts from OCR
+                            final ocrText = (await cloudTextRecognizer.processImage(visionImage)).text.trim();
+                            print('OCR recognized string: $ocrText');
+                            cloudTextRecognizer.close();
+                            final link = Link.tryParse(ocrText);
+                            if (link == null) {
+                              Fluttertoast.showToast(
+                                msg: 'Der Link enthält Fehler.\nGelesen wurde: $ocrText',
+                                toastLength: Toast.LENGTH_LONG,
+                                gravity: ToastGravity.BOTTOM,
+                                fontSize: 16.0,
+                              );
+                            } else {
+                              final target = aliasCubit.resolve(link);
+                              if (target == null) {
+                                Fluttertoast.showToast(
+                                  msg: 'Kein passender Alias.\nGelesen wurde: $ocrText',
+                                  toastLength: Toast.LENGTH_LONG,
+                                  gravity: ToastGravity.BOTTOM,
+                                  fontSize: 16.0,
+                                );
+                              } else {
+                                assert(service != null);
+                                print('Sending target to viewer ${jsonEncode(target)}');
+                                http.post(
+                                  'http://$service.ip:$service.port/open',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                  },
+                                  body: jsonEncode(target),
+                                );
+                              }
+                            }
+                          }
+                          try {
+                            File(imageXfile.path).deleteSync();
+                            croppedImage.deleteSync();
+                          } catch (exception) {
+                            print('Couldn\'t delete temporary file: $exception');
+                          }
+                        });
+                      },
+              ),
             ),
           ),
         ),
@@ -459,18 +440,22 @@ class TakePictureFAB extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = onPressed != null ? Theme.of(context).accentColor : Colors.grey;
     return FloatingActionButton(
       backgroundColor: Colors.transparent,
       shape: CircleBorder(
         side: BorderSide(
           width: 4,
-          color: Theme.of(context).accentColor,
+          color: color,
         ),
       ),
       elevation: 0,
       child: Container(
         margin: EdgeInsets.all(8),
-        decoration: BoxDecoration(shape: BoxShape.circle, color: Theme.of(context).accentColor),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: color,
+        ),
       ),
       onPressed: onPressed,
     );
