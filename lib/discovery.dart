@@ -7,7 +7,6 @@ import 'package:flutter/widgets.dart';
 
 final String _externalViewerServiceName = 'com example desktop';
 
-// FIXME Offer static configuration as fail safe
 class ServiceDiscoveryCubit extends Cubit<ResolvedBonsoirService> {
   final String type;
 
