@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' hide Link;
+import 'package:bonsoir/bonsoir.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:firebase_ml_vision/firebase_ml_vision.dart';
 import 'package:flutter/foundation.dart';
@@ -395,96 +396,10 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
               builder: (context) {
                 final discoveredService = context.watch<ServiceDiscoveryCubit>().state;
                 final staticService = context.watch<_ExternalViewerStaticConfig>();
-                print('Builder');
                 return TakePictureFAB(
-                  onPressed: discoveredService == null && staticService.ip.isEmpty
-                      ? null
-                      : () {
-                          _cameraController.takePicture().then(
-                            (imageXFile) async {
-                              File croppedImage = await ImageCropper.cropImage(
-                                  sourcePath: imageXFile.path,
-                                  compressFormat: ImageCompressFormat.png,
-                                  aspectRatioPresets: [CropAspectRatioPreset.ratio16x9],
-                                  androidUiSettings: AndroidUiSettings(hideBottomControls: true));
-                              if (croppedImage != null) {
-                                var ocrText = '';
-                                DocumentTextRecognizer textRecognizer;
-                                try {
-                                  // FIXME Handle multiple detected lines
-                                  final textRecognizer = FirebaseVision.instance
-                                      .cloudTextRecognizer(CloudTextRecognizerOptions(hintedLanguages: ['en', 'de']));
-                                  final visionImage = FirebaseVisionImage.fromFilePath(croppedImage.path);
-                                  // Remove leading or trailing white space - artifacts from OCR
-                                  ocrText = (await textRecognizer.processImage(visionImage)).text.trim();
-                                } catch (e) {
-                                  print('An error occurred during text recognition $e');
-                                } finally {
-                                  textRecognizer?.close();
-                                }
-                                print('OCR recognized string: $ocrText');
-                                final link = ocrText.isNotEmpty ? Link.tryParse(ocrText) : null;
-                                if (link == null) {
-                                  Fluttertoast.showToast(
-                                    msg: 'Der Link enthält Fehler.\nGelesen wurde: $ocrText',
-                                    toastLength: Toast.LENGTH_LONG,
-                                    gravity: ToastGravity.BOTTOM,
-                                    fontSize: 16.0,
-                                  );
-                                } else {
-                                  final target = BlocProvider.of<AliasCubit>(context).resolve(link);
-                                  if (target == null) {
-                                    Fluttertoast.showToast(
-                                      msg: 'Kein passender Alias.\nGelesen wurde: $ocrText',
-                                      toastLength: Toast.LENGTH_LONG,
-                                      gravity: ToastGravity.BOTTOM,
-                                      fontSize: 16.0,
-                                    );
-                                  } else {
-                                    // FIXME Static configuration should have priority so it can act as an overwrite
-                                    assert(discoveredService != null || staticService.ip.isNotEmpty);
-                                    final ip = discoveredService?.ip ?? staticService.ip;
-                                    final port = discoveredService?.port ?? staticService.port;
-                                    print('Sending target (${jsonEncode(target)}) to viewer ($ip:$port).');
-                                    final response = http.post(
-                                      'http://$ip:$port/open',
-                                      headers: {
-                                        'Content-Type': 'application/json',
-                                        'Accept': 'application/json',
-                                      },
-                                      body: jsonEncode(target),
-                                    );
-                                    response.catchError((e) {
-                                      Fluttertoast.showToast(
-                                        msg: 'Die Verbindung mit dem Viewer ist gescheitert (${e.toString()}).',
-                                        toastLength: Toast.LENGTH_LONG,
-                                        gravity: ToastGravity.BOTTOM,
-                                        fontSize: 16.0,
-                                      );
-                                    }).then((response) {
-                                      final status = response?.statusCode ?? -1;
-                                      if (status >= 400) {
-                                        Fluttertoast.showToast(
-                                          msg:
-                                              'Bei der Kommunikation mit dem Viewer ist ein Fehler aufgetreten, Statuscode $status.',
-                                          toastLength: Toast.LENGTH_LONG,
-                                          gravity: ToastGravity.BOTTOM,
-                                          fontSize: 16.0,
-                                        );
-                                      }
-                                    });
-                                  }
-                                }
-                              }
-                              try {
-                                File(imageXFile.path).deleteSync();
-                                croppedImage.deleteSync();
-                              } catch (exception) {
-                                print('Couldn\'t delete temporary file: $exception');
-                              }
-                            },
-                          );
-                        },
+                  onPressed: discoveredService != null || staticService.ip.isNotEmpty
+                      ? () => _onTakePicture(context, discoveredService, staticService)
+                      : null,
                 );
               },
             ),
@@ -496,45 +411,135 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
             icon: Icon(Icons.settings),
             color: Theme.of(context).accentColor,
             padding: EdgeInsets.all(16),
-            onPressed: () async {
-              final staticService = Provider.of<_ExternalViewerStaticConfig>(context, listen: false);
-              final ip = await showDialog(
-                context: context,
-                builder: (context) {
-                  var ip = staticService.ip;
-                  return AlertDialog(
-                    content: Container(
-                      child: Wrap(
-                        children: [
-                          TextFormField(
-                            initialValue: ip,
-                            onChanged: (text) => ip = text,
-                            decoration: InputDecoration(
-                              labelText: 'IP Adresse Computer',
-                              hintText: 'Beispiel: 192.168.0.1',
-                              suffix: IconButton(
-                                icon: Icon(
-                                  Icons.check,
-                                  color: Colors.lightGreen,
-                                ),
-                                padding: EdgeInsets.zero,
-                                onPressed: () => Navigator.of(context).pop(ip),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              );
-              await _preferences.setString('externalViewerIP', ip);
-              staticService.ip = ip;
-            },
+            onPressed: () => _onSettings(context),
           ),
         )
       ],
     );
+  }
+
+  Future<void> _onTakePicture(
+    BuildContext context,
+    ResolvedBonsoirService discoveredService,
+    _ExternalViewerStaticConfig staticService,
+  ) async {
+    final imageXFile = await _cameraController.takePicture();
+    File croppedImage = await ImageCropper.cropImage(
+        sourcePath: imageXFile.path,
+        compressFormat: ImageCompressFormat.png,
+        aspectRatioPresets: [CropAspectRatioPreset.ratio16x9],
+        androidUiSettings: AndroidUiSettings(hideBottomControls: true));
+    if (croppedImage != null) {
+      var ocrText = '';
+      DocumentTextRecognizer textRecognizer;
+      try {
+        // FIXME Handle multiple detected lines
+        final textRecognizer =
+            FirebaseVision.instance.cloudTextRecognizer(CloudTextRecognizerOptions(hintedLanguages: ['en', 'de']));
+        final visionImage = FirebaseVisionImage.fromFilePath(croppedImage.path);
+        // Remove leading or trailing white space - artifacts from OCR
+        ocrText = (await textRecognizer.processImage(visionImage)).text.trim();
+      } catch (e) {
+        print('An error occurred during text recognition $e');
+      } finally {
+        textRecognizer?.close();
+      }
+      print('OCR recognized string: $ocrText');
+      final link = ocrText.isNotEmpty ? Link.tryParse(ocrText) : null;
+      if (link == null) {
+        Fluttertoast.showToast(
+          msg: 'Der Link enthält Fehler.\nGelesen wurde: $ocrText',
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          fontSize: 16.0,
+        );
+      } else {
+        final target = BlocProvider.of<AliasCubit>(context).resolve(link);
+        if (target == null) {
+          Fluttertoast.showToast(
+            msg: 'Kein passender Alias.\nGelesen wurde: $ocrText',
+            toastLength: Toast.LENGTH_LONG,
+            gravity: ToastGravity.BOTTOM,
+            fontSize: 16.0,
+          );
+        } else {
+          // FIXME Static configuration should have priority so it can act as an overwrite
+          assert(discoveredService != null || staticService.ip.isNotEmpty);
+          final ip = discoveredService?.ip ?? staticService.ip;
+          final port = discoveredService?.port ?? staticService.port;
+          print('Sending target (${jsonEncode(target)}) to viewer ($ip:$port).');
+          final response = http.post(
+            'http://$ip:$port/open',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode(target),
+          );
+          response.catchError((e) {
+            Fluttertoast.showToast(
+              msg: 'Die Verbindung mit dem Viewer ist gescheitert (${e.toString()}).',
+              toastLength: Toast.LENGTH_LONG,
+              gravity: ToastGravity.BOTTOM,
+              fontSize: 16.0,
+            );
+          }).then((response) {
+            final status = response?.statusCode ?? -1;
+            if (status >= 400) {
+              Fluttertoast.showToast(
+                msg: 'Bei der Kommunikation mit dem Viewer ist ein Fehler aufgetreten, Statuscode $status.',
+                toastLength: Toast.LENGTH_LONG,
+                gravity: ToastGravity.BOTTOM,
+                fontSize: 16.0,
+              );
+            }
+          });
+        }
+      }
+    }
+    try {
+      File(imageXFile.path).deleteSync();
+      croppedImage.deleteSync();
+    } catch (exception) {
+      print('Couldn\'t delete temporary file: $exception');
+    }
+  }
+
+  Future<void> _onSettings(BuildContext context) async {
+    final staticService = Provider.of<_ExternalViewerStaticConfig>(context, listen: false);
+    final ip = await showDialog(
+          context: context,
+          builder: (context) {
+            var ip = staticService.ip;
+            return AlertDialog(
+              content: Container(
+                child: Wrap(
+                  children: [
+                    TextFormField(
+                      initialValue: ip,
+                      onChanged: (text) => ip = text,
+                      decoration: InputDecoration(
+                        labelText: 'IP Adresse Computer',
+                        hintText: 'Beispiel: 192.168.0.1',
+                        suffix: IconButton(
+                          icon: Icon(
+                            Icons.check,
+                            color: Colors.lightGreen,
+                          ),
+                          padding: EdgeInsets.zero,
+                          onPressed: () => Navigator.of(context).pop(ip),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ) ??
+        '';
+    await _preferences.setString('externalViewerIP', ip);
+    staticService.ip = ip;
   }
 }
 
