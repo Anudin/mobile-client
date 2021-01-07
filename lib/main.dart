@@ -176,7 +176,7 @@ class AliasMasterView extends StatelessWidget {
   }
 }
 
-// TODO Disable keyboard correction
+// FIXME Disable keyboard correction
 class AliasDetailView extends StatefulWidget {
   final Alias alias;
 
@@ -347,7 +347,7 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
   }
 
   Future<void> _initializeCameraController() {
-    _cameraController = CameraController(_cameras[0], ResolutionPreset.high);
+    _cameraController = CameraController(_cameras[0], ResolutionPreset.veryHigh);
     return _cameraController.initialize().then((_) {
       if (!mounted) {
         return;
@@ -550,7 +550,6 @@ class _ExternalViewerStaticConfig extends ValueNotifier<String> {
   set ip(String text) {
     print('Static IP ' + (text.isEmpty ? 'removed.' : 'set to $text'));
     value = text;
-    notifyListeners();
   }
 
   String get ip => value;

@@ -4,7 +4,10 @@ import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:mobile/link.dart';
 
 class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
-  AliasCubit() : super(BuiltMap());
+  AliasCubit()
+      : super(BuiltMap({
+          'wiki': Alias('wiki', 'wikipedia.com/wiki/'),
+        }));
 
   bool isAvailable(String name) {
     return !state.containsKey(name);
@@ -94,7 +97,7 @@ class Alias {
   }
 
   static bool isValidPosition(String position) {
-    return Link.isValidPosition(position);
+    return true;
   }
 
   Alias copyWith({String name, String URL, String position}) => Alias(
@@ -117,12 +120,9 @@ class Alias {
 @immutable
 class Target {
   final String URL;
-
-  /// Either a plain number (page number), or a number with an appended 's' (time in seconds), no leading zeros.
-  static final RegExp positionFormat = RegExp('^[1-9]\\d*[s]?\$');
   final String position;
 
-  Target(this.URL, [this.position]) : assert(position == null || positionFormat.hasMatch(position));
+  Target(this.URL, [this.position]);
 
   @override
   String toString() {

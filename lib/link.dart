@@ -8,11 +8,12 @@ class Link {
 
   Link(this.alias, [this.prefix, this.position]);
 
-  // TODO Each possible part of a link should have its own blacklist
-  static final _charBlacklist = RegExp('[^-\\.\\#a-zA-Z\\d\\s]');
+  static final _aliasFormat = RegExp('^[-a-zA-Z\\d\\s]+');
+  static final _positionFormat = RegExp('\\s+#[\\-\\_\\.a-zA-Z\\d\\s]+\$');
 
   factory Link.tryParse(String text) {
-    if (_charBlacklist.hasMatch(text)) return null;
+    text = _autocorrect(text);
+    // FIXME Check alias format
 
     // Remove leading or trailing white space - artifacts from OCR
     final p1 = text.split('-').map((s) => s.trim()).toList();
@@ -32,16 +33,19 @@ class Link {
     }
   }
 
-  // TODO Handle malformed positions?
   static List<String> _extractValidPosition(String link) {
-    final index = link.indexOf(RegExp('\\s#[\\.a-zA-Z\\d\\s]+\$'));
+    final index = link.indexOf(_positionFormat);
     // Whitespaces are introduced as an artifact of OCR, remove those
     final position = link.substring(index + 2).replaceAll(RegExp('\\s'), '');
-    if (index != -1 && isValidPosition(position)) {
+    if (index != -1) {
       return [link.substring(0, index), position];
     } else {
       return [link];
     }
+  }
+
+  static String _autocorrect(String link) {
+    return link.replaceAll('チ', '7').replaceAll('×', 'x');
   }
 
   static bool isValidPosition(String position) {
