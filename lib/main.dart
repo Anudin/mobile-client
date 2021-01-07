@@ -433,12 +433,12 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
       var ocrText = '';
       DocumentTextRecognizer textRecognizer;
       try {
-        // FIXME Handle multiple detected lines
         final textRecognizer =
             FirebaseVision.instance.cloudTextRecognizer(CloudTextRecognizerOptions(hintedLanguages: ['en', 'de']));
         final visionImage = FirebaseVisionImage.fromFilePath(croppedImage.path);
+        final visionResult = await textRecognizer.processImage(visionImage);
         // Remove leading or trailing white space - artifacts from OCR
-        ocrText = (await textRecognizer.processImage(visionImage)).text.trim();
+        ocrText = visionResult.blocks[0].text.trim();
       } catch (e) {
         print('An error occurred during text recognition $e');
       } finally {
