@@ -9,23 +9,25 @@ class Link {
   Link(this.alias, [this.prefix, this.position]);
 
   static final _aliasFormat = RegExp('^[-a-zA-Z\\d\\s]+');
-  static final _positionFormat = RegExp('\\s+#[\\-\\_\\.a-zA-Z\\d\\s]+\$');
+
+  // TODO Position should be URI compliant
+  static final _positionFormat = RegExp('\\s+#.+\$');
 
   factory Link.tryParse(String text) {
     text = _autocorrect(text);
-    // FIXME Check alias format
+    // TODO Check alias format
 
     // Remove leading or trailing white space - artifacts from OCR
     final p1 = text.split('-').map((s) => s.trim()).toList();
     // Contains a prefix
     if (p1.length == 2) {
       final p2 = _extractValidPosition(p1[0]);
-      return Link(p2[0], p1[0], p2.length == 2 ? p2[1] : null);
+      return Link(p2[0].toLowerCase(), p1[0], p2.length == 2 ? p2[1] : null);
     }
     // Contains no prefix
     else if (p1.length == 1) {
       final p2 = _extractValidPosition(p1[0]);
-      return Link(p2[0], null, p2.length == 2 ? p2[1] : null);
+      return Link(p2[0].toLowerCase(), null, p2.length == 2 ? p2[1] : null);
     }
     // Malformed
     else {

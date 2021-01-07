@@ -28,6 +28,7 @@ dependencies:
   hydrated_bloc: ^6.1.0
   built_collection: ^4.3.2
   http: ^0.12.2
+  validators: ^2.0.0
 
   flutter:
     sdk: flutter

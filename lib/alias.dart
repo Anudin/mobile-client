@@ -25,8 +25,7 @@ class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
   }
 
   void update(Alias alias, Alias update) {
-    print(isAvailable(alias.name));
-    assert(alias.name == update.name || isAvailable(update.name));
+    assert(alias.name == update.name || (Alias.isValidName(update.name) && isAvailable(update.name)));
     emit(
       state.rebuild((builder) {
         if (alias.name != update.name) builder.remove(alias.name);
@@ -41,13 +40,17 @@ class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
     );
   }
 
+  // FIXME Fuzzy matching
   Target resolve(Link link) {
     print('Trying to resolve link $link');
     final alias = state[link.prefix ?? '' + link.alias];
     if (alias != null) {
       final position = link.position ?? alias.position;
       final target = Target(
-          alias.URL, Link.isValidTimestamp(position) ? '${Link.convertTimestampToSeconds(position)}s' : position);
+          alias.URL,
+          (position != null && Link.isValidTimestamp(position))
+              ? '${Link.convertTimestampToSeconds(position)}s'
+              : position);
       print('Successfully resolved to $target');
       return target;
     } else {
@@ -88,7 +91,7 @@ class Alias {
 
   static bool isValidName(String alias) {
     // TODO Implementation
-    return alias.isNotEmpty;
+    return alias.isNotEmpty && !alias.contains(RegExp('[A-Z]'));
   }
 
   static bool isValidURL(String URL) {
@@ -132,7 +135,7 @@ class Target {
   Map<String, dynamic> toJson() {
     return {
       'URL': URL,
-      'position': position,
+      'position': position ?? '',
     };
   }
 }
