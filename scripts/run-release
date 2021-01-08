@@ -1,0 +1,4 @@
+#!/bin/env bash
+flutter clean
+./clear_app_data
+flutter run --release
