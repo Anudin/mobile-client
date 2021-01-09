@@ -7,6 +7,10 @@ class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
   AliasCubit()
       : super(BuiltMap({
           'wiki': Alias('wiki', 'wikipedia.com/wiki/'),
+          'yt': Alias('yt', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'),
+          'audio': Alias('audio', 'https://file-examples-com.github.io/uploads/2017/11/file_example_WAV_2MG.wav'),
+          'video': Alias('video', 'http://techslides.com/demos/sample-videos/small.ogv'),
+          'pdf': Alias('pdf', 'https://helpx.adobe.com/de/pdf/acrobat_reference.pdf', '15'),
         }));
 
   bool isAvailable(String name) {
@@ -43,13 +47,13 @@ class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
   // FIXME Fuzzy matching
   Target resolve(Link link) {
     print('Trying to resolve link $link');
-    final alias = state[link.prefix ?? '' + link.alias];
+    final alias = state[(link.prefix != null ? '${link.prefix}-' : '') + link.alias];
     if (alias != null) {
       final position = link.position ?? alias.position;
       final target = Target(
           alias.URL,
           (position != null && Link.isValidTimestamp(position))
-              ? '${Link.convertTimestampToSeconds(position)}s'
+              ? '${Link.convertTimestampToSeconds(position)}'
               : position);
       print('Successfully resolved to $target');
       return target;

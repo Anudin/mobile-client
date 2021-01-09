@@ -10,8 +10,7 @@ class Link {
 
   static final _aliasFormat = RegExp('^[-a-zA-Z\\d\\s]+');
 
-  // TODO Position should be URI compliant
-  static final _positionFormat = RegExp('\\s+#.+\$');
+  static final _positionFormat = RegExp('#.+\$');
 
   factory Link.tryParse(String text) {
     text = _autocorrect(text);
@@ -21,13 +20,13 @@ class Link {
     final p1 = text.split('-').map((s) => s.trim()).toList();
     // Contains a prefix
     if (p1.length == 2) {
-      final p2 = _extractValidPosition(p1[0]);
-      return Link(p2[0].toLowerCase(), p1[0], p2.length == 2 ? p2[1] : null);
+      final p2 = _extractValidPosition(p1[1]);
+      return Link(p2[0].toLowerCase().trim(), p1[0], p2.length == 2 ? p2[1] : null);
     }
     // Contains no prefix
     else if (p1.length == 1) {
       final p2 = _extractValidPosition(p1[0]);
-      return Link(p2[0].toLowerCase(), null, p2.length == 2 ? p2[1] : null);
+      return Link(p2[0].toLowerCase().trim(), null, p2.length == 2 ? p2[1] : null);
     }
     // Malformed
     else {
@@ -38,7 +37,7 @@ class Link {
   static List<String> _extractValidPosition(String link) {
     final index = link.indexOf(_positionFormat);
     // Whitespaces are introduced as an artifact of OCR, remove those
-    final position = link.substring(index + 2).replaceAll(RegExp('\\s'), '');
+    final position = link.substring(index + 1).replaceAll(RegExp('\\s'), '');
     if (index != -1) {
       return [link.substring(0, index), position];
     } else {
@@ -51,13 +50,15 @@ class Link {
   }
 
   static bool isValidPosition(String position) {
-    return isValidPageNumber(position) || isValidTimestamp(position);
+    // TODO Position should be URI compliant
+    return true;
   }
 
   static bool isValidPageNumber(String pageNumber) {
     return RegExp('^\\d+\$').hasMatch(pageNumber);
   }
 
+  // TODO Falsely requires leading zero for floating point numbers
   static bool isValidTimestamp(String timestamp) {
     if (timestamp.isNotEmpty) {
       final h = RegExp('\\d+\\.?\\d*h').allMatches(timestamp);

@@ -293,9 +293,9 @@ class _AliasDetailViewState extends State<AliasDetailView> {
       final hasValidChanges = _formKey.currentState.validate();
       if (hasValidChanges) {
         Navigator.of(context).pop(Alias(
-          _nameEditingController.text,
-          _URLEditingController.text,
-          _positionEditingController.text != '' ? _positionEditingController.text : null,
+          _nameEditingController.text.trim(),
+          _URLEditingController.text.trim(),
+          _positionEditingController.text != '' ? _positionEditingController.text.trim() : null,
         ));
       } else {
         Fluttertoast.showToast(
