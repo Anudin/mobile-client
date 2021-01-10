@@ -424,9 +424,10 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
     ResolvedBonsoirService discoveredService,
     _ExternalViewerStaticConfig staticService,
   ) async {
-    final imageXFile = await _cameraController.takePicture();
+    final imagePath = '${(await getTemporaryDirectory()).path}/picture.jpg';
+    await _cameraController.takePicture(imagePath);
     File croppedImage = await ImageCropper.cropImage(
-        sourcePath: imageXFile.path,
+        sourcePath: imagePath,
         compressFormat: ImageCompressFormat.png,
         aspectRatioPresets: [CropAspectRatioPreset.ratio16x9],
         androidUiSettings: AndroidUiSettings(hideBottomControls: true));
@@ -499,7 +500,7 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
       }
     }
     try {
-      File(imageXFile.path).deleteSync();
+      File(imagePath).deleteSync();
       croppedImage.deleteSync();
     } catch (exception) {
       print('Couldn\'t delete temporary file: $exception');
