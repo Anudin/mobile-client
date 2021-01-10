@@ -264,7 +264,7 @@ class _AliasDetailViewState extends State<AliasDetailView> {
                 validator: (text) =>
                     text.isNotEmpty && !Alias.isValidPosition(text) ? 'Position has invalid format.' : null,
               ),
-              Spacer(),
+              SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
