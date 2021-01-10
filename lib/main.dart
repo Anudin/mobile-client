@@ -180,7 +180,6 @@ class AliasMasterView extends StatelessWidget {
   }
 }
 
-// FIXME Disable keyboard correction
 class AliasDetailView extends StatefulWidget {
   final Alias alias;
 
@@ -236,6 +235,7 @@ class _AliasDetailViewState extends State<AliasDetailView> {
               TextFormField(
                 decoration: InputDecoration(labelText: 'Name'),
                 controller: _nameEditingController,
+                autocorrect: false,
                 validator: (text) => !Alias.isValidName(text)
                     ? 'Name has invalid format.'
                     : text != widget.alias.name && !aliasCubit.isAvailable(text)
@@ -246,6 +246,7 @@ class _AliasDetailViewState extends State<AliasDetailView> {
                 controller: _URLEditingController,
                 decoration: InputDecoration(labelText: 'URL'),
                 maxLines: null,
+                autocorrect: false,
                 validator: (text) => !Alias.isValidURL(text) ? 'URL has invalid format.' : null,
               ),
               TextFormField(
@@ -259,6 +260,7 @@ class _AliasDetailViewState extends State<AliasDetailView> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                autocorrect: false,
                 validator: (text) =>
                     text.isNotEmpty && !Alias.isValidPosition(text) ? 'Position has invalid format.' : null,
               ),
