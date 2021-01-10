@@ -160,8 +160,11 @@ class AliasMasterView extends StatelessWidget {
               },
               child: ListTile(
                 title: Text(state[alias].name),
-                // TODO Shorten URL: remove http[s]://www. and limit length, if necessary add ...
-                subtitle: Text(state[alias].URL),
+                subtitle: Text(
+                  state[alias].URL.replaceFirst(RegExp('(?:http[s]?:\/\/)?(?:www\.)?'), ''),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 trailing: Text(state[alias].position ?? ''),
                 onTap: () async {
                   // TODO Give feedback
@@ -216,68 +219,66 @@ class _AliasDetailViewState extends State<AliasDetailView> {
     final aliasCubit = BlocProvider.of<AliasCubit>(context);
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Form(
-            key: _formKey,
-            autovalidateMode: AutovalidateMode.onUserInteraction,
-            onWillPop: () async {
-              if (_hasChanges()) {
-                final shouldDiscardChanges = await showDiscardChangesDialog(context);
-                return shouldDiscardChanges;
-              } else {
-                return true;
-              }
-            },
-            child: Column(
-              children: [
-                TextFormField(
-                  decoration: InputDecoration(labelText: 'Name'),
-                  controller: _nameEditingController,
-                  validator: (text) => !Alias.isValidName(text)
-                      ? 'Name has invalid format.'
-                      : text != widget.alias.name && !aliasCubit.isAvailable(text)
-                          ? 'An alias with the given name already exists.'
-                          : null,
-                ),
-                TextFormField(
-                  controller: _URLEditingController,
-                  decoration: InputDecoration(labelText: 'URL'),
-                  maxLines: null,
-                  validator: (text) => !Alias.isValidURL(text) ? 'URL has invalid format.' : null,
-                ),
-                TextFormField(
-                  controller: _positionEditingController,
-                  decoration: InputDecoration(
-                    labelText: 'Position',
-                    prefixText: '# ',
-                    prefixStyle: TextStyle(
-                      fontSize: 16,
-                      color: Colors.black54,
-                      fontWeight: FontWeight.bold,
-                    ),
+        child: Form(
+          key: _formKey,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
+          onWillPop: () async {
+            if (_hasChanges()) {
+              final shouldDiscardChanges = await showDiscardChangesDialog(context);
+              return shouldDiscardChanges;
+            } else {
+              return true;
+            }
+          },
+          child: ListView(
+            padding: EdgeInsets.all(16),
+            children: [
+              TextFormField(
+                decoration: InputDecoration(labelText: 'Name'),
+                controller: _nameEditingController,
+                validator: (text) => !Alias.isValidName(text)
+                    ? 'Name has invalid format.'
+                    : text != widget.alias.name && !aliasCubit.isAvailable(text)
+                        ? 'An alias with the given name already exists.'
+                        : null,
+              ),
+              TextFormField(
+                controller: _URLEditingController,
+                decoration: InputDecoration(labelText: 'URL'),
+                maxLines: null,
+                validator: (text) => !Alias.isValidURL(text) ? 'URL has invalid format.' : null,
+              ),
+              TextFormField(
+                controller: _positionEditingController,
+                decoration: InputDecoration(
+                  labelText: 'Position',
+                  prefixText: '# ',
+                  prefixStyle: TextStyle(
+                    fontSize: 16,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.bold,
                   ),
-                  validator: (text) =>
-                      text.isNotEmpty && !Alias.isValidPosition(text) ? 'Position has invalid format.' : null,
                 ),
-                Spacer(),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    FlatButton(
-                      child: Text('Verwerfen'),
-                      // TODO Show discard changes dialog?
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    RaisedButton(
-                      color: Colors.lightGreen,
-                      child: Text('Bestätigen'),
-                      onPressed: _onConfirmChanges,
-                    ),
-                  ],
-                )
-              ],
-            ),
+                validator: (text) =>
+                    text.isNotEmpty && !Alias.isValidPosition(text) ? 'Position has invalid format.' : null,
+              ),
+              Spacer(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  FlatButton(
+                    child: Text('Verwerfen'),
+                    // TODO Show discard changes dialog?
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  RaisedButton(
+                    color: Colors.lightGreen,
+                    child: Text('Bestätigen'),
+                    onPressed: _onConfirmChanges,
+                  ),
+                ],
+              )
+            ],
           ),
         ),
       ),
