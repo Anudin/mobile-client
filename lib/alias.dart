@@ -44,7 +44,7 @@ class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
     );
   }
 
-  // FIXME Fuzzy matching
+  // TODO Fuzzy matching
   Target resolve(Link link) {
     print('Trying to resolve link $link');
     final alias = state[(link.prefix != null ? '${link.prefix}-' : '') + link.alias];

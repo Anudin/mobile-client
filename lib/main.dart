@@ -7,6 +7,7 @@ import 'package:firebase_ml_vision/firebase_ml_vision.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -40,7 +41,6 @@ class BlocLogging extends BlocObserver {
 }
 
 // TODO Consistent handling of string sanitization from OCR artifacts
-// FIXME Fix orientation, especially in cropping view
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   Bloc.observer = BlocLogging();
@@ -49,6 +49,7 @@ Future<void> main() async {
   HydratedBloc.storage = await HydratedStorage.build(
     storageDirectory: await getApplicationSupportDirectory(),
   );
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   if (!kReleaseMode) {
     Wakelock.enable();
   }
@@ -543,9 +544,8 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
   }
 }
 
-// FIXME Change port number!
 class _ExternalViewerStaticConfig extends ValueNotifier<String> {
-  final port = '3000';
+  final port = '34501';
 
   set ip(String text) {
     print('Static IP ' + (text.isEmpty ? 'removed.' : 'set to $text'));
