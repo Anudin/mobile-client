@@ -1,6 +1,7 @@
 import 'package:built_collection/built_collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:mobile/levenshtein.dart';
 import 'package:mobile/link.dart';
 
 class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
@@ -44,10 +45,25 @@ class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
     );
   }
 
-  // TODO Fuzzy matching
   Target resolve(Link link) {
     print('Trying to resolve link $link');
-    final alias = state[(link.prefix != null ? '${link.prefix}-' : '') + link.alias];
+    final ocrKey = (link.prefix != null ? '${link.prefix}-' : '') + link.alias;
+
+    // Fuzzy matches recognized text with possible candidates. Fuzzy matching is
+    // more robust against mistakes from text recognition than literal matching.
+    final distanceThreshold = 2;
+    final lengthDifferenceThreshold = (distanceThreshold / 2).floor();
+    var alias;
+    var aliasDistance = distanceThreshold + 1;
+    for (var key in state.keys) {
+      if ((ocrKey.length - key.length).abs() > lengthDifferenceThreshold) continue;
+      final distance = levenshtein(ocrKey, key, distanceThreshold);
+      if (distance < aliasDistance) {
+        aliasDistance = distance;
+        alias = state[key];
+        if (distance == 0) break;
+      }
+    }
     if (alias != null) {
       final position = link.position ?? alias.position;
       final target = Target(
