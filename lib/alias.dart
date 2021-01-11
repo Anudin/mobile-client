@@ -1,5 +1,6 @@
 import 'package:built_collection/built_collection.dart';
 import 'package:flutter/foundation.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
 import 'package:mobile/levenshtein.dart';
 import 'package:mobile/link.dart';
@@ -53,7 +54,8 @@ class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
     // more robust against mistakes from text recognition than literal matching.
     final distanceThreshold = 2;
     final lengthDifferenceThreshold = (distanceThreshold / 2).floor();
-    var alias;
+    Alias alias;
+    String aliasKey;
     var aliasDistance = distanceThreshold + 1;
     for (var key in state.keys) {
       if ((ocrKey.length - key.length).abs() > lengthDifferenceThreshold) continue;
@@ -61,10 +63,17 @@ class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
       if (distance < aliasDistance) {
         aliasDistance = distance;
         alias = state[key];
+        aliasKey = key;
         if (distance == 0) break;
       }
     }
     if (alias != null) {
+      Fluttertoast.showToast(
+        msg: 'Gelesen wurde: $ocrKey\nAufgelöst zu: $aliasKey',
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        fontSize: 16.0,
+      );
       final position = link.position ?? alias.position;
       final target = Target(
           alias.URL,
