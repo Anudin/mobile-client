@@ -6,11 +6,11 @@ import 'package:mobile/link.dart';
 class AliasCubit extends HydratedCubit<BuiltMap<String, Alias>> {
   AliasCubit()
       : super(BuiltMap({
-          'wiki': Alias('wiki', 'wikipedia.com/wiki/'),
-          'yt': Alias('yt', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'),
-          'audio': Alias('audio', 'https://file-examples-com.github.io/uploads/2017/11/file_example_WAV_2MG.wav'),
-          'video': Alias('video', 'http://techslides.com/demos/sample-videos/small.ogv'),
           'pdf': Alias('pdf', 'https://helpx.adobe.com/de/pdf/acrobat_reference.pdf', '15'),
+          'wiki': Alias('wiki', 'wikipedia.com/wiki/', 'Bubble_sort#Variations'),
+          'yt': Alias('yt', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', '1m30s'),
+          'video': Alias('video', 'http://techslides.com/demos/sample-videos/small.ogv'),
+          'audio': Alias('audio', 'https://file-examples-com.github.io/uploads/2017/11/file_example_WAV_2MG.wav'),
         }));
 
   bool isAvailable(String name) {
