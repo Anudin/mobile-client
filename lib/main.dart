@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io' hide Link;
 import 'package:bonsoir/bonsoir.dart';
 import 'package:built_collection/built_collection.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_ml_vision/firebase_ml_vision.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -43,6 +45,9 @@ class BlocLogging extends BlocObserver {
 // TODO Consistent handling of string sanitization from OCR artifacts
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  // Pass all uncaught errors from the framework to Crashlytics.
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterError;
   Bloc.observer = BlocLogging();
   _cameras = await availableCameras();
   _preferences = await SharedPreferences.getInstance();
@@ -51,6 +56,7 @@ Future<void> main() async {
   );
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   if (!kReleaseMode) {
+    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(false);
     Wakelock.enable();
   }
   runApp(
@@ -428,6 +434,10 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
     _ExternalViewerStaticConfig staticService,
   ) async {
     final imagePath = '${(await getTemporaryDirectory()).path}/picture.jpg';
+    // takePicture throws an error if the file already exists
+    try {
+      File(imagePath).deleteSync();
+    } catch (e) {}
     await _cameraController.takePicture(imagePath);
     File croppedImage = await ImageCropper.cropImage(
         sourcePath: imagePath,
