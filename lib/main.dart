@@ -478,10 +478,9 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
             fontSize: 16.0,
           );
         } else {
-          // FIXME Static configuration should have priority so it can act as an overwrite
-          assert(discoveredService != null || staticService.ip.isNotEmpty);
-          final ip = discoveredService?.ip ?? staticService.ip;
-          final port = discoveredService?.port ?? staticService.port;
+          final ip = staticService.ip != '' ? staticService.ip : discoveredService?.ip;
+          final port = staticService.ip != '' ? staticService.port : discoveredService?.port;
+          assert(ip != null && port != null);
           print('Sending target (${jsonEncode(target)}) to viewer ($ip:$port).');
           final response = http.post(
             'http://$ip:$port/open',
